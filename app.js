@@ -1,236 +1,331 @@
 /* ==========================================================================
-   Hidroponik NFT Dashboard — MQTT Integration with Multiple Broker Fallback
+   SMART FARMING IOT DASHBOARD - FULL MQTT INTEGRATION v2.1
+   DENGAN ESP32-CAM SUPPORT - HTTP IMAGE
    ========================================================================== */
 
 // ==================== MQTT CONFIGURATION ====================
-const MQTT_BROKERS = [
-    {
-        name: 'EMQX',
-        broker: 'wss://broker.emqx.io:8084/mqtt',
-        port: 8084
-    },
-    {
-        name: 'HiveMQ',
-        broker: 'wss://broker.hivemq.com:8084/mqtt',
-        port: 8084
-    },
-    {
-        name: 'Mosquitto',
-        broker: 'wss://test.mosquitto.org:8081/mqtt',
-        port: 8081
-    }
-];
-
-let CURRENT_BROKER_INDEX = 0;
-
 const MQTT_CONFIG = {
-    get broker() {
-        return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker;
-    },
-    get brokerName() {
-        return MQTT_BROKERS[CURRENT_BROKER_INDEX].name;
-    },
+    // HiveMQ Public Broker (WebSocket Secure)
+    broker: 'wss://broker.hivemq.com:8084/mqtt',
+    
+    // Jika pakai HiveMQ Cloud berbayar, uncomment ini:
+    // broker: 'wss://YOUR_CLUSTER.s1.eu.hivemq.cloud:8884/mqtt',
+    // username: 'YOUR_USERNAME',
+    // password: 'YOUR_PASSWORD',
+    
     topics: {
-        ph: 'hydroponic/sensor/ph',
-        tds: 'hydroponic/sensor/tds',
-        temp: 'hydroponic/sensor/temp',
-        all: 'hydroponic/sensor/all',
+        // Sensor Topics (dari ESP32)
+        temperature: 'smartfarm/sensor/temperature',
+        humidity: 'smartfarm/sensor/humidity',
+        soilMoisture: 'smartfarm/sensor/soil_moisture',
+        waterLevel: 'smartfarm/sensor/water_level',
+        light: 'smartfarm/sensor/light',
         
-        controlAerator: 'hydroponic/control/aerator',
-        controlSirkulasi1: 'hydroponic/control/sirkulasi1',
-        controlSirkulasi2: 'hydroponic/control/sirkulasi2',
-        controlPhUp: 'hydroponic/control/phup',
-        controlPhDown: 'hydroponic/control/phdown',
-        controlNutrisiA: 'hydroponic/control/nutrisia',
-        controlNutrisiB: 'hydroponic/control/nutrisib',
+        // Actuator Topics (dari ESP32)
+        pump: 'smartfarm/actuator/pump',
+        lamp: 'smartfarm/actuator/lamp',
+        buzzer: 'smartfarm/actuator/buzzer',
         
-        statusAerator: 'hydroponic/status/aerator',
-        statusSirkulasi1: 'hydroponic/status/sirkulasi1',
-        statusSirkulasi2: 'hydroponic/status/sirkulasi2',
-        statusPhUp: 'hydroponic/status/phup',
-        statusPhDown: 'hydroponic/status/phdown',
-        statusNutrisiA: 'hydroponic/status/nutrisia',
-        statusNutrisiB: 'hydroponic/status/nutrisib',
-        statusDevice: 'hydroponic/status/device',
-        statusDashboard: 'hydroponic/status/dashboard'
+        // Control Topics (ke ESP32)
+        controlPump: 'smartfarm/control/pump',
+        controlLamp: 'smartfarm/control/lamp',
+        controlBuzzer: 'smartfarm/control/buzzer',
+        controlAuto: 'smartfarm/control/auto_mode',
+        controlQuick: 'smartfarm/control/quick_water',
+        
+        // Status Topic (dari ESP32)
+        status: 'smartfarm/status/esp32',
+        
+        // Feedback (dari ESP32)
+        feedback: 'smartfarm/feedback/#',
+        
+        // Camera Topics
+        cameraCapture: 'smartfarm/camera/capture',
+        cameraResponse: 'smartfarm/camera/response',
+        cameraStatus: 'smartfarm/camera/status'
     }
 };
-
-// ==================== KONFIGURASI SENSOR ====================
-const SENSORS = [
-  {
-    key: "tds",
-    label: "TDS / Nutrisi",
-    unit: "ppm",
-    decimals: 0,
-    scaleMin: 0,
-    scaleMax: 2000,
-    idealMin: 800,
-    idealMax: 1400,
-    icon: '<path d="M12 2v6M12 22v-6M4.9 4.9l4.2 4.2M14.9 14.9l4.2 4.2M2 12h6M22 12h-6M4.9 19.1l4.2-4.2M14.9 9.1l4.2-4.2"/>',
-  },
-  {
-    key: "temp",
-    label: "Suhu Air",
-    unit: "°C",
-    decimals: 1,
-    scaleMin: 10,
-    scaleMax: 40,
-    idealMin: 18,
-    idealMax: 28,
-    icon: '<path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/>',
-  },
-  {
-    key: "ph",
-    label: "pH Larutan",
-    unit: "pH",
-    decimals: 2,
-    scaleMin: 3,
-    scaleMax: 10,
-    idealMin: 5.5,
-    idealMax: 7.0,
-    icon: '<path d="M3 3v18h18"/><path d="m7 14 3-3 3 3 5-5"/>',
-  },
-];
-
-// ==================== KONFIGURASI POMPA ====================
-const PUMPS = [
-  { key: "aerator", name: "Aerator", pin: 12, group: "Aerasi", controlTopic: 'hydroponic/control/aerator', statusTopic: 'hydroponic/status/aerator' },
-  { key: "sirkulasi1", name: "Sirkulasi 1", pin: 13, group: "Sirkulasi", controlTopic: 'hydroponic/control/sirkulasi1', statusTopic: 'hydroponic/status/sirkulasi1' },
-  { key: "sirkulasi2", name: "Sirkulasi 2", pin: 11, group: "Sirkulasi", controlTopic: 'hydroponic/control/sirkulasi2', statusTopic: 'hydroponic/status/sirkulasi2' },
-  { key: "nutrisiA", name: "Nutrisi A", pin: 14, group: "Dosis Nutrisi", controlTopic: 'hydroponic/control/nutrisia', statusTopic: 'hydroponic/status/nutrisia' },
-  { key: "nutrisiB", name: "Nutrisi B", pin: 17, group: "Dosis Nutrisi", controlTopic: 'hydroponic/control/nutrisib', statusTopic: 'hydroponic/status/nutrisib' },
-];
-const PUMP_GROUP_ORDER = ["Aerasi", "Sirkulasi", "Dosis Nutrisi"];
-
-// ==================== PRESET TANAMAN ====================
-const PLANT_PRESETS = [
-  { key: "selada", name: "Selada", phMin: 6.0, phMax: 7.0 },
-  { key: "sawi", name: "Sawi", phMin: 5.5, phMax: 6.5 },
-  { key: "kangkung", name: "Kangkung", phMin: 5.5, phMax: 6.5 },
-  { key: "bayam", name: "Bayam", phMin: 6.0, phMax: 7.0 },
-  { key: "kailan", name: "Kailan", phMin: 5.5, phMax: 6.5 },
-  { key: "pakcoy", name: "Pakcoy", phMin: 6.8, phMax: 7.0 },
-  { key: "seledri", name: "Seledri", phMin: 6.3, phMax: 6.7 },
-  { key: "cabe", name: "Cabe", phMin: 6.0, phMax: 6.5 },
-  { key: "peterseli", name: "Peterseli", phMin: 5.5, phMax: 6.0 },
-  { key: "strawberry", name: "Strawberry", phMin: 5.8, phMax: 6.2 },
-  { key: "ketimun", name: "Ketimun", phMin: 5.3, phMax: 5.7 },
-];
-
-const PH_ALLOWED_MIN = 5.5;
-const PH_ALLOWED_MAX = 7.0;
-const PUMP_ICON = '<path d="M4 20V10a2 2 0 0 1 2-2h6l3-3v14"/><path d="M12 8V4h4"/><circle cx="8" cy="15" r="1"/>';
 
 // ==================== STATE ====================
-const HISTORY_LEN = 40;
 const state = {
-  values: { tds: 0, temp: 0, ph: 0 },
-  history: { tds: [], temp: [], ph: [] },
-  pumps: { aerator: false, sirkulasi1: false, sirkulasi2: false, nutrisiA: false, nutrisiB: false, phUp: false, phDown: false },
-  phMode: "auto",
-  phTarget: { min: 5.8, max: 6.3 },
-  preset: "custom",
-  fuzzy: { asamKuat: 0, asamLemah: 0, netral: 0, basaLemah: 0, basaKuat: 0, action: "idle", strength: 0 },
-  broker: "connecting",
-  esp: "waiting",
-  lastPacket: 0,
-  packets: 0,
-  startTime: Date.now(),
-  mqttConnected: false,
-  clientId: '',
-  hasReceivedData: false,
-  currentBroker: 0
+    // Sensor Data
+    temperature: null,
+    humidity: null,
+    soilMoisture: null,
+    waterLevel: null,
+    light: '--',
+    soilStatus: '--',
+    ldrADC: null,
+    soilADC: null,
+    
+    // Actuator States
+    pump: false,
+    lamp: false,
+    buzzer: false,
+    
+    // System
+    systemStatus: 'ONLINE',
+    autoMode: true,
+    alarm: false,
+    uptime: 0,
+    waterUsed: 0,
+    wifiConnected: false,
+    mqttConnected: false,
+    
+    // MQTT
+    connected: false,
+    lastUpdate: null,
+    messageCount: 0,
+    reconnectAttempts: 0,
+    hasReceivedData: false,
+    
+    // Chart History
+    chartLabels: [],
+    chartTempData: [],
+    chartSoilData: [],
+    maxChartPoints: 30,
+    
+    // Quick Water
+    quickWaterActive: false,
+    quickWaterCountdown: 0,
+    
+    // ESP32-CAM IP
+    espCamIP: '192.168.0.21' // Ganti dengan IP ESP32-CAM kamu
 };
 
-// seed flat history
-SENSORS.forEach((s) => {
-  state.history[s.key] = Array.from({ length: HISTORY_LEN }, () => 0);
-});
+// ==================== DOM REFERENCES ====================
+const DOM = {
+    // System Status
+    sysStatusDot: document.getElementById('sysStatusDot'),
+    sysStatusText: document.getElementById('sysStatusText'),
+    sysStatusSub: document.getElementById('sysStatusSub'),
+    sysStatusBadge: document.getElementById('sysStatusBadge'),
+    sysStatusTime: document.getElementById('sysStatusTime'),
+    headerSystemStatus: document.getElementById('headerSystemStatus'),
+    headerStatusDot: document.getElementById('headerStatusDot'),
+    headerStatusPill: document.getElementById('headerStatusPill'),
+    lastUpdateTime: document.getElementById('lastUpdateTime'),
+    
+    // Sidebar
+    sidebarStatusDot: document.getElementById('sidebarStatusDot'),
+    sidebarStatusTitle: document.getElementById('sidebarStatusTitle'),
+    sidebarStatusSub: document.getElementById('sidebarStatusSub'),
+    
+    // Sensor Cards
+    valTemperature: document.getElementById('valTemperature'),
+    statusTemperature: document.getElementById('statusTemperature'),
+    tempTrendText: document.getElementById('tempTrendText'),
+    tempTrend: document.getElementById('tempTrend'),
+    
+    valHumidity: document.getElementById('valHumidity'),
+    statusHumidity: document.getElementById('statusHumidity'),
+    humidityTrendText: document.getElementById('humidityTrendText'),
+    humidityTrend: document.getElementById('humidityTrend'),
+    
+    valSoilMoisture: document.getElementById('valSoilMoisture'),
+    barSoilMoisture: document.getElementById('barSoilMoisture'),
+    statusSoilMoisture: document.getElementById('statusSoilMoisture'),
+    
+    valWaterLevel: document.getElementById('valWaterLevel'),
+    barWaterLevel: document.getElementById('barWaterLevel'),
+    statusWaterLevel: document.getElementById('statusWaterLevel'),
+    
+    // Environment Summary
+    envTemp: document.getElementById('envTemp'),
+    envHumidity: document.getElementById('envHumidity'),
+    envLight: document.getElementById('envLight'),
+    envSoil: document.getElementById('envSoil'),
+    envWater: document.getElementById('envWater'),
+    
+    // Actuators
+    statePump: document.getElementById('statePump'),
+    stateLamp: document.getElementById('stateLamp'),
+    stateBuzzer: document.getElementById('stateBuzzer'),
+    stateSystem: document.getElementById('stateSystem'),
+    dotSystem: document.getElementById('dotSystem'),
+    systemMCUStatus: document.getElementById('systemMCUStatus'),
+    
+    togglePumpManual: document.getElementById('togglePumpManual'),
+    toggleLampManual: document.getElementById('toggleLampManual'),
+    toggleBuzzerManual: document.getElementById('toggleBuzzerManual'),
+    togglePumpCard: document.getElementById('togglePumpCard'),
+    toggleLampCard: document.getElementById('toggleLampCard'),
+    
+    modeTextPump: document.getElementById('modeTextPump'),
+    modeTextLamp: document.getElementById('modeTextLamp'),
+    modeTextBuzzer: document.getElementById('modeTextBuzzer'),
+    
+    iconBoxPump: document.getElementById('iconBoxPump'),
+    iconBoxLamp: document.getElementById('iconBoxLamp'),
+    iconBoxBuzzer: document.getElementById('iconBoxBuzzer'),
+    
+    // Automation Panel
+    toggleGlobalAuto: document.getElementById('toggleGlobalAuto'),
+    badgeGlobalAuto: document.getElementById('badgeGlobalAuto'),
+    badgePumpMode: document.getElementById('badgePumpMode'),
+    badgeLampMode: document.getElementById('badgeLampMode'),
+    autoSoilCurrent: document.getElementById('autoSoilCurrent'),
+    autoSoilPumpStatus: document.getElementById('autoSoilPumpStatus'),
+    autoLightStatus: document.getElementById('autoLightStatus'),
+    autoLightLampStatus: document.getElementById('autoLightLampStatus'),
+    cardControlPump: document.getElementById('cardControlPump'),
+    cardControlLamp: document.getElementById('cardControlLamp'),
+    
+    // Quick Actions
+    btnQuickWater: document.getElementById('btnQuickWater'),
+    labelQuickWater: document.getElementById('labelQuickWater'),
+    btnToggleLamp: document.getElementById('btnToggleLamp'),
+    labelToggleLamp: document.getElementById('labelToggleLamp'),
+    
+    // Camera
+    btnCaptureImage: document.getElementById('btnCaptureImage'),
+    cameraCanvas: document.getElementById('cameraCanvas'),
+    cameraPlaceholder: document.getElementById('cameraPlaceholder'),
+    cameraLoading: document.getElementById('cameraLoading'),
+    recentGallery: document.getElementById('recentGallery'),
+    galleryEmpty: document.getElementById('galleryEmpty'),
+    btnClearRecent: document.getElementById('btnClearRecent'),
+    cameraStatusBadge: document.getElementById('cameraStatusBadge'),
+    cameraMetaStatus: document.getElementById('cameraMetaStatus'),
+    
+    // Modal
+    imageModal: document.getElementById('imageModal'),
+    modalImage: document.getElementById('modalImage'),
+    modalTimestamp: document.getElementById('modalTimestamp'),
+    modalMeta: document.getElementById('modalMeta'),
+    modalClose: document.getElementById('modalClose'),
+    
+    // Toast
+    toastContainer: document.getElementById('toastContainer'),
+    
+    // Buttons
+    btnReconnectMQTT: document.getElementById('btnReconnectMQTT')
+};
 
 // ==================== MQTT CLIENT ====================
 let mqttClient = null;
-let reconnectTimer = null;
-let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
+let quickWaterTimer = null;
+let chartInstance = null;
+let recentCaptures = [];
+let isConnecting = false;
+let reconnectTimeout = null;
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('🌱 Hydroponic NFT Dashboard');
+    console.log('🌱 Smart Farming Dashboard v2.1');
     console.log('📡 MQTT Broker:', MQTT_CONFIG.broker);
-    console.log('📡 Broker Name:', MQTT_CONFIG.brokerName);
+    console.log('📋 Topics:', MQTT_CONFIG.topics);
+    console.log('📷 ESP32-CAM IP:', state.espCamIP);
     
-    renderSensors();
-    renderPhPanel();
-    renderPumps();
-    renderConnStatus();
-    connectMQTT();
+    initNavigation();
+    initChart();
+    initMQTT();
+    initManualControls();
+    initCameraModule();
+    initReconnectButton();
+    updateLastTimestamp();
     
-    setInterval(tickClock, 1000);
-    tickClock();
-});
-
-// ==================== CONNECT MQTT ====================
-function connectMQTT() {
-    if (mqttClient && mqttClient.connected) {
-        mqttClient.end();
-        mqttClient = null;
+    if (DOM.toggleGlobalAuto) {
+        DOM.toggleGlobalAuto.checked = true;
+        state.autoMode = true;
     }
     
-    state.broker = "connecting";
-    state.mqttConnected = false;
-    renderConnStatus();
+    state.systemStatus = 'ONLINE';
+    renderAll();
     
-    const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
-    state.clientId = clientId;
-    document.getElementById('clientId').textContent = clientId;
-    document.getElementById('connHost').textContent = MQTT_CONFIG.brokerName + ' (' + MQTT_CONFIG.broker + ')';
-    
-    const options = {
-        clientId: clientId,
-        clean: true,
-        reconnectPeriod: 3000,
-        keepAlive: 60,
-        connectTimeout: 15000,
-        will: {
-            topic: MQTT_CONFIG.topics.statusDashboard,
-            payload: 'offline',
-            qos: 1,
-            retain: false
-        }
-    };
-    
-    console.log('🔄 Connecting to MQTT...');
-    console.log('📡 Broker:', MQTT_CONFIG.broker);
-    console.log('📡 Name:', MQTT_CONFIG.brokerName);
+    setInterval(checkConnectionStatus, 10000);
+});
+
+// ==================== NAVIGATION ====================
+function initNavigation() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const toggleBtn = document.getElementById('mobileToggleBtn');
+    const closeBtn = document.getElementById('mobileCloseBtn');
+
+    function openSidebar() {
+        sidebar.classList.add('open');
+        overlay.classList.add('active');
+    }
+
+    function closeSidebar() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('active');
+    }
+
+    if (toggleBtn) toggleBtn.addEventListener('click', openSidebar);
+    if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
+    if (overlay) overlay.addEventListener('click', closeSidebar);
+
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            navItems.forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+            if (window.innerWidth <= 992) {
+                closeSidebar();
+            }
+        });
+    });
+}
+
+// ==================== MQTT ====================
+function initMQTT() {
+    if (isConnecting) return;
+    isConnecting = true;
     
     try {
+        if (mqttClient) {
+            try {
+                mqttClient.end(true);
+            } catch (e) {}
+            mqttClient = null;
+        }
+        
+        const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
+        
+        const options = {
+            clientId: clientId,
+            clean: true,
+            reconnectPeriod: 3000,
+            keepAlive: 60,
+            connectTimeout: 10000
+        };
+        
+        if (MQTT_CONFIG.username && MQTT_CONFIG.password) {
+            options.username = MQTT_CONFIG.username;
+            options.password = MQTT_CONFIG.password;
+        }
+        
+        console.log('🔄 Connecting to MQTT...');
+        updateConnectionUI('connecting', 'Connecting...', 'Connecting');
+        
         mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
         
         mqttClient.on('connect', () => {
-            console.log('✅ MQTT Connected to', MQTT_CONFIG.brokerName);
-            state.broker = "online";
+            console.log('✅ MQTT Connected to HiveMQ');
+            isConnecting = false;
+            state.connected = true;
             state.mqttConnected = true;
-            state.startTime = Date.now();
-            reconnectAttempts = 0;
-            renderConnStatus();
+            state.reconnectAttempts = 0;
             
-            showToast('✅ MQTT Connected to ' + MQTT_CONFIG.brokerName + '!', 'success');
+            updateConnectionUI('connected', 'MQTT Connected', 'Online');
+            showToast('MQTT Connected successfully!', 'success');
             
             // Subscribe ke semua topik
             const topics = [
-                MQTT_CONFIG.topics.ph,
-                MQTT_CONFIG.topics.tds,
-                MQTT_CONFIG.topics.temp,
-                MQTT_CONFIG.topics.all,
-                MQTT_CONFIG.topics.statusAerator,
-                MQTT_CONFIG.topics.statusSirkulasi1,
-                MQTT_CONFIG.topics.statusSirkulasi2,
-                MQTT_CONFIG.topics.statusPhUp,
-                MQTT_CONFIG.topics.statusPhDown,
-                MQTT_CONFIG.topics.statusNutrisiA,
-                MQTT_CONFIG.topics.statusNutrisiB,
-                MQTT_CONFIG.topics.statusDevice
+                MQTT_CONFIG.topics.temperature,
+                MQTT_CONFIG.topics.humidity,
+                MQTT_CONFIG.topics.soilMoisture,
+                MQTT_CONFIG.topics.waterLevel,
+                MQTT_CONFIG.topics.light,
+                MQTT_CONFIG.topics.pump,
+                MQTT_CONFIG.topics.lamp,
+                MQTT_CONFIG.topics.buzzer,
+                MQTT_CONFIG.topics.status,
+                MQTT_CONFIG.topics.feedback,
+                MQTT_CONFIG.topics.cameraResponse,
+                MQTT_CONFIG.topics.cameraStatus
             ];
             
             topics.forEach(topic => {
@@ -243,241 +338,249 @@ function connectMQTT() {
                 });
             });
             
-            // Publish status online
-            mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1, retain: false });
-            
-            // Request status dari ESP32
             setTimeout(() => {
-                if (mqttClient && mqttClient.connected) {
-                    mqttClient.publish('hydroponic/status/request', 'STATUS');
-                    showToast('📡 Menunggu data dari ESP32...', 'info');
-                }
+                showToast('📡 Waiting for sensor data...', 'info');
             }, 1000);
         });
-        
+
         mqttClient.on('message', (topic, message) => {
             const payload = message.toString();
-            console.log('📥', topic, '->', payload.substring(0, 100));
+            console.log('📥', topic, '->', payload.substring(0, 100) + (payload.length > 100 ? '...' : ''));
             handleMQTTMessage(topic, payload);
         });
-        
+
         mqttClient.on('error', (err) => {
             console.error('❌ MQTT Error:', err);
-            state.broker = "offline";
+            isConnecting = false;
+            state.connected = false;
             state.mqttConnected = false;
-            renderConnStatus();
-            showToast('❌ MQTT Error with ' + MQTT_CONFIG.brokerName + ': ' + err.message, 'error');
+            updateConnectionUI('disconnected', 'MQTT Error', 'Offline');
+            showToast('MQTT Error: ' + err.message, 'error');
             
-            // Try next broker
-            switchToNextBroker();
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            reconnectTimeout = setTimeout(() => {
+                if (!state.connected) {
+                    initMQTT();
+                }
+            }, 10000);
         });
-        
+
         mqttClient.on('offline', () => {
             console.log('⚠️ MQTT Offline');
-            state.broker = "offline";
+            isConnecting = false;
+            state.connected = false;
             state.mqttConnected = false;
-            renderConnStatus();
+            updateConnectionUI('disconnected', 'MQTT Offline', 'Offline');
         });
-        
+
         mqttClient.on('reconnect', () => {
             console.log('🔄 MQTT Reconnecting...');
-            state.broker = "connecting";
-            renderConnStatus();
+            updateConnectionUI('connecting', 'Reconnecting...', 'Connecting');
         });
-        
-        mqttClient.on('close', () => {
-            console.log('🔌 MQTT Connection Closed');
-            state.broker = "offline";
-            state.mqttConnected = false;
-            renderConnStatus();
-            
-            // Try next broker after delay
-            setTimeout(() => {
-                if (!state.mqttConnected) {
-                    switchToNextBroker();
-                }
-            }, 5000);
-        });
-        
+
     } catch (e) {
         console.error('❌ MQTT Init error:', e);
-        state.broker = "offline";
-        renderConnStatus();
-        showToast('❌ MQTT Error: ' + e.message, 'error');
+        isConnecting = false;
+        showToast('MQTT Init error: ' + e.message, 'error');
         
-        // Try next broker
-        setTimeout(() => {
-            switchToNextBroker();
-        }, 5000);
+        if (reconnectTimeout) clearTimeout(reconnectTimeout);
+        reconnectTimeout = setTimeout(() => {
+            initMQTT();
+        }, 10000);
     }
-}
-
-// ==================== SWITCH TO NEXT BROKER ====================
-function switchToNextBroker() {
-    CURRENT_BROKER_INDEX = (CURRENT_BROKER_INDEX + 1) % MQTT_BROKERS.length;
-    console.log('🔄 Switching to broker:', MQTT_BROKERS[CURRENT_BROKER_INDEX].name);
-    showToast('🔄 Switching to ' + MQTT_BROKERS[CURRENT_BROKER_INDEX].name + '...', 'info');
-    
-    // Update config
-    Object.defineProperty(MQTT_CONFIG, 'broker', {
-        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker; }
-    });
-    Object.defineProperty(MQTT_CONFIG, 'brokerName', {
-        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].name; }
-    });
-    
-    document.getElementById('connHost').textContent = MQTT_CONFIG.brokerName + ' (' + MQTT_CONFIG.broker + ')';
-    
-    // Reconnect
-    connectMQTT();
 }
 
 // ==================== HANDLE MQTT MESSAGE ====================
 function handleMQTTMessage(topic, payload) {
-    state.lastPacket = Date.now();
-    state.packets++;
+    const topics = MQTT_CONFIG.topics;
+    
+    state.lastUpdate = new Date();
+    updateLastTimestamp();
+    state.messageCount++;
     state.hasReceivedData = true;
     
-    // Update status ESP
-    if (topic === MQTT_CONFIG.topics.statusDevice) {
-        state.esp = payload === 'online' ? 'active' : 'inactive';
-        renderConnStatus();
+    // ==========================================================
+    // HANDLE INDIVIDUAL SENSOR TOPICS
+    // ==========================================================
+    
+    if (topic === topics.temperature) {
+        state.temperature = parseFloat(payload);
+        updateChartData(state.temperature, null);
+        if (state.systemStatus === 'OFFLINE' || state.systemStatus === 'SENSOR ERROR') {
+            state.systemStatus = 'ONLINE';
+        }
+        renderAll();
         return;
     }
     
-    // Parse sensor data
-    if (topic === MQTT_CONFIG.topics.all) {
+    else if (topic === topics.humidity) {
+        state.humidity = parseFloat(payload);
+        if (state.systemStatus === 'OFFLINE' || state.systemStatus === 'SENSOR ERROR') {
+            state.systemStatus = 'ONLINE';
+        }
+        renderAll();
+        return;
+    }
+    
+    else if (topic === topics.soilMoisture) {
+        state.soilMoisture = parseInt(payload);
+        updateChartData(null, state.soilMoisture);
+        if (state.systemStatus === 'OFFLINE' || state.systemStatus === 'SENSOR ERROR') {
+            state.systemStatus = 'ONLINE';
+        }
+        renderAll();
+        return;
+    }
+    
+    else if (topic === topics.waterLevel) {
+        state.waterLevel = parseInt(payload);
+        if (state.systemStatus === 'OFFLINE' || state.systemStatus === 'SENSOR ERROR') {
+            state.systemStatus = 'ONLINE';
+        }
+        renderAll();
+        return;
+    }
+    
+    else if (topic === topics.light) {
+        state.light = payload;
+        if (state.systemStatus === 'OFFLINE' || state.systemStatus === 'SENSOR ERROR') {
+            state.systemStatus = 'ONLINE';
+        }
+        renderAll();
+        return;
+    }
+    
+    else if (topic === topics.pump) {
+        state.pump = payload === 'ON';
+        syncPumpToggle();
+        renderAll();
+        return;
+    }
+    else if (topic === topics.lamp) {
+        state.lamp = payload === 'ON';
+        syncLampToggle();
+        renderAll();
+        return;
+    }
+    else if (topic === topics.buzzer) {
+        state.buzzer = payload === 'ON';
+        renderAll();
+        return;
+    }
+    
+    // ==========================================================
+    // PARSE JSON STATUS
+    // ==========================================================
+    
+    if (topic === topics.status) {
         try {
             const data = JSON.parse(payload);
-            if (data.ph !== undefined) {
-                state.values.ph = parseFloat(data.ph);
-                state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
-            }
-            if (data.tds !== undefined) {
-                state.values.tds = parseFloat(data.tds);
-                state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
-            }
-            if (data.temperature !== undefined) {
-                state.values.temp = parseFloat(data.temperature);
-                state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
-            }
+            console.log('📊 Status JSON:', data);
             
-            renderSensors();
-            renderPhPanel();
-            updateFuzzyLogic();
+            if (data.temperature !== undefined) state.temperature = data.temperature;
+            if (data.humidity !== undefined) state.humidity = data.humidity;
+            if (data.soil_moisture !== undefined) state.soilMoisture = data.soil_moisture;
+            if (data.soil_status !== undefined) state.soilStatus = data.soil_status;
+            if (data.water_level !== undefined) state.waterLevel = data.water_level;
+            if (data.light !== undefined) state.light = data.light;
+            if (data.ldr_adc !== undefined) state.ldrADC = data.ldr_adc;
+            if (data.soil_adc !== undefined) state.soilADC = data.soil_adc;
+            if (data.pump !== undefined) state.pump = data.pump === 'ON';
+            if (data.lamp !== undefined) state.lamp = data.lamp === 'ON';
+            if (data.buzzer !== undefined) state.buzzer = data.buzzer === 'ON';
+            if (data.mode !== undefined) state.autoMode = data.mode === 'AUTO';
+            if (data.status !== undefined) state.systemStatus = data.status;
+            if (data.alarm !== undefined) state.alarm = data.alarm;
+            if (data.uptime !== undefined) state.uptime = data.uptime;
+            if (data.water_used !== undefined) state.waterUsed = data.water_used;
+            if (data.wifi !== undefined) state.wifiConnected = data.wifi;
+            if (data.mqtt !== undefined) state.mqttConnected = data.mqtt;
             
+            renderAll();
+            return;
         } catch (e) {
-            console.warn('⚠️ Failed to parse JSON:', e);
+            console.warn('⚠️ Failed to parse status JSON:', e);
+        }
+    }
+    
+    // ==========================================================
+    // HANDLE FEEDBACK TOPICS
+    // ==========================================================
+    
+    if (topic === 'smartfarm/feedback/pump') {
+        showToast('💧 Pump feedback: ' + payload, payload === 'SAFETY_BLOCKED' ? 'warning' : 'info');
+        return;
+    }
+    else if (topic === 'smartfarm/feedback/lamp') {
+        showToast('💡 Lamp feedback: ' + payload, 'info');
+        return;
+    }
+    else if (topic === 'smartfarm/feedback/quick_water') {
+        if (payload === 'STARTED') {
+            showToast('⏱️ Quick water started!', 'success');
+        } else if (payload === 'SAFETY_BLOCKED') {
+            showToast('⛔ Quick water blocked - water level critical!', 'warning');
+        } else {
+            showToast('⏱️ Quick water: ' + payload, 'info');
         }
         return;
     }
     
-    // Individual sensor topics
-    if (topic === MQTT_CONFIG.topics.ph) {
-        state.values.ph = parseFloat(payload);
-        state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
-        renderSensors();
-        renderPhPanel();
-        updateFuzzyLogic();
+    // ==========================================================
+    // HANDLE CAMERA RESPONSE
+    // ==========================================================
+    
+    if (topic === topics.cameraResponse) {
+        console.log('📸 Camera response:', payload);
+        showToast('📸 Camera: ' + payload, 'info');
+        if (payload === 'CAPTURING') {
+            if (DOM.cameraStatusBadge) {
+                DOM.cameraStatusBadge.textContent = '📸 CAPTURING';
+                DOM.cameraStatusBadge.className = 'badge badge-off';
+                DOM.cameraStatusBadge.style.borderColor = 'var(--accent-amber)';
+                DOM.cameraStatusBadge.style.color = 'var(--accent-amber)';
+            }
+        } else if (payload === 'DONE') {
+            if (DOM.cameraStatusBadge) {
+                DOM.cameraStatusBadge.textContent = 'IMAGE READY';
+                DOM.cameraStatusBadge.className = 'badge badge-success';
+                DOM.cameraStatusBadge.style.borderColor = '';
+                DOM.cameraStatusBadge.style.color = '';
+            }
+            if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+            if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+        } else if (payload === 'ERROR' || payload === 'ENCODE_ERROR' || payload === 'MQTT_ERROR') {
+            if (DOM.cameraStatusBadge) {
+                DOM.cameraStatusBadge.textContent = 'ERROR';
+                DOM.cameraStatusBadge.className = 'badge badge-off';
+                DOM.cameraStatusBadge.style.borderColor = 'var(--accent-red)';
+                DOM.cameraStatusBadge.style.color = 'var(--accent-red)';
+            }
+            if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+            if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+            showToast('❌ Camera error: ' + payload, 'error');
+        }
         return;
     }
     
-    if (topic === MQTT_CONFIG.topics.tds) {
-        state.values.tds = parseFloat(payload);
-        state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
-        renderSensors();
+    if (topic === topics.cameraStatus) {
+        try {
+            const data = JSON.parse(payload);
+            console.log('📷 Camera Status:', data);
+            updateCameraStatus(data);
+        } catch (e) {
+            console.warn('Camera status parse error:', e);
+        }
         return;
     }
     
-    if (topic === MQTT_CONFIG.topics.temp) {
-        state.values.temp = parseFloat(payload);
-        state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
-        renderSensors();
-        return;
-    }
-    
-    // Pump status
-    const pumpMap = {
-        'hydroponic/status/aerator': 'aerator',
-        'hydroponic/status/sirkulasi1': 'sirkulasi1',
-        'hydroponic/status/sirkulasi2': 'sirkulasi2',
-        'hydroponic/status/phup': 'phUp',
-        'hydroponic/status/phdown': 'phDown',
-        'hydroponic/status/nutrisia': 'nutrisiA',
-        'hydroponic/status/nutrisib': 'nutrisiB'
-    };
-    
-    if (pumpMap[topic]) {
-        state.pumps[pumpMap[topic]] = payload === 'ON';
-        renderPumps();
-        renderPhPanel();
-        return;
-    }
-}
-
-// ==================== FUZZY LOGIC ====================
-function triangle(x, a, b, c) {
-  if (x <= a || x >= c) return 0;
-  if (x === b) return 1;
-  return x < b ? (x - a) / (b - a) : (c - x) / (c - b);
-}
-
-function shoulderLeft(x, a, b) {
-  if (x <= a) return 1;
-  if (x >= b) return 0;
-  return (b - x) / (b - a);
-}
-
-function shoulderRight(x, a, b) {
-  if (x <= a) return 0;
-  if (x >= b) return 1;
-  return (x - a) / (b - a);
-}
-
-function fuzzyPhController(ph, targetMin, targetMax) {
-  const center = (targetMin + targetMax) / 2;
-  const e = ph - center;
-
-  const asamKuat = shoulderLeft(e, -1.0, -0.5);
-  const asamLemah = triangle(e, -0.7, -0.3, -0.05);
-  const netral = triangle(e, -0.15, 0, 0.15);
-  const basaLemah = triangle(e, 0.05, 0.3, 0.7);
-  const basaKuat = shoulderRight(e, 0.5, 1.0);
-
-  const rules = [
-    { w: asamKuat, out: 1.0 },
-    { w: asamLemah, out: 0.5 },
-    { w: netral, out: 0.0 },
-    { w: basaLemah, out: -0.5 },
-    { w: basaKuat, out: -1.0 },
-  ];
-
-  const sumW = rules.reduce((a, r) => a + r.w, 0);
-  const crisp = sumW > 0 ? rules.reduce((a, r) => a + r.w * r.out, 0) / sumW : 0;
-
-  let action = "idle";
-  if (crisp > 0.08) action = "dosing-up";
-  else if (crisp < -0.08) action = "dosing-down";
-
-  return {
-    memberships: { asamKuat, asamLemah, netral, basaLemah, basaKuat },
-    crisp,
-    action,
-    strength: Math.min(1, Math.abs(crisp)),
-  };
-}
-
-function updateFuzzyLogic() {
-    const ph = state.values.ph || 0;
-    const { min, max } = state.phTarget;
-    const fuzzy = fuzzyPhController(ph, min, max);
-    state.fuzzy = fuzzy;
+    renderAll();
 }
 
 // ==================== PUBLISH CONTROL ====================
 function publishControl(topic, value) {
-    if (!mqttClient || !mqttClient.connected) {
-        showToast('⚠️ MQTT not connected!', 'warning');
+    if (!state.connected || !mqttClient) {
+        showToast('MQTT not connected!', 'warning');
         return false;
     }
     
@@ -487,387 +590,1112 @@ function publishControl(topic, value) {
         return true;
     } catch (e) {
         console.error('❌ Publish error:', e);
-        showToast('❌ Failed to publish: ' + e.message, 'error');
+        showToast('Failed to publish: ' + e.message, 'error');
         return false;
     }
 }
 
-// ==================== RENDER FUNCTIONS ====================
-
-function renderConnStatus() {
-  const bDot = document.getElementById("brokerDot");
-  const bTxt = document.getElementById("brokerStatus");
-  const eDot = document.getElementById("espDot");
-  const eTxt = document.getElementById("espStatus");
-  const reBtn = document.getElementById("reconnectBtn");
-
-  bDot.className = "dot " + (state.broker === "online" ? "online" : state.broker === "connecting" ? "connecting" : "offline");
-  bTxt.textContent = state.broker === "online" ? "Terhubung (" + MQTT_CONFIG.brokerName + ")" : state.broker === "connecting" ? "Menghubungkan…" : "Terputus";
-
-  const espOk = state.broker === "online" && state.esp === "active";
-  eDot.className = "dot " + (espOk ? "online" : state.esp === "waiting" ? "connecting" : "offline");
-  eTxt.textContent = !state.broker || state.broker !== "online" ? "Tidak ada sinyal" : espOk ? "Aktif" : state.esp === "waiting" ? "Menunggu…" : "Tidak aktif";
-
-  reBtn.textContent = state.broker === "online" ? "Putuskan" : "Sambungkan";
-  reBtn.className = "btn-reconnect" + (state.broker === "online" ? "" : " reconnect");
+// ==================== CONNECTION CHECK ====================
+function checkConnectionStatus() {
+    if (!state.connected && !isConnecting) {
+        console.log('🔄 Connection lost, reconnecting...');
+        initMQTT();
+    }
 }
 
-function sensorStatus(cfg, v) {
-  if (v < cfg.idealMin || v > cfg.idealMax) {
-    const span = cfg.idealMax - cfg.idealMin;
-    const dist = v < cfg.idealMin ? cfg.idealMin - v : v - cfg.idealMax;
-    return dist > span * 0.35 ? "crit" : "warn";
-  }
-  return "ok";
+// ==================== UI UPDATE FUNCTIONS ====================
+function renderAll() {
+    renderSystemStatus();
+    renderSensorCards();
+    renderEnvironmentSummary();
+    renderActuators();
+    renderAutomationPanel();
 }
 
-const STATUS_TEXT = { ok: "Ideal", warn: "Perhatian", crit: "Kritis" };
-
-function sparkPath(data, w, h) {
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  return data
-    .map((d, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((d - min) / range) * (h - 4) - 2;
-      return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+function updateConnectionUI(status, title, sub) {
+    const dot = DOM.sidebarStatusDot;
+    const titleEl = DOM.sidebarStatusTitle;
+    const subEl = DOM.sidebarStatusSub;
+    
+    if (dot) {
+        dot.className = 'status-indicator ' + 
+            (status === 'connected' ? 'online' : 
+             status === 'connecting' ? 'connecting' : 'offline');
+    }
+    if (titleEl) titleEl.textContent = title;
+    if (subEl) subEl.textContent = sub;
 }
 
-function renderSensors() {
-  const grid = document.getElementById("sensorGrid");
-  grid.innerHTML = SENSORS.map((s) => {
-    const v = state.values[s.key] || 0;
-    const st = sensorStatus(s, v);
-    const data = state.history[s.key] || Array(HISTORY_LEN).fill(v);
-    const path = sparkPath(data, 240, 40);
-    const idealLeft = ((s.idealMin - s.scaleMin) / (s.scaleMax - s.scaleMin)) * 100;
-    const idealWidth = ((s.idealMax - s.idealMin) / (s.scaleMax - s.scaleMin)) * 100;
-    const markerPos = Math.max(0, Math.min(100, ((v - s.scaleMin) / (s.scaleMax - s.scaleMin)) * 100));
-    return `
-      <div class="sensor-card">
-        <div class="sc-head">
-          <div class="sc-title">
-            <span class="sc-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${s.icon}</svg></span>
-            ${s.label}
-          </div>
-          <span class="sc-badge ${st}">${STATUS_TEXT[st]}</span>
-        </div>
-        <div class="sc-value">
-          <span class="sc-num">${v.toFixed(s.decimals)}</span>
-          <span class="sc-unit">${s.unit}</span>
-        </div>
-        <svg class="sc-spark" viewBox="0 0 240 40" preserveAspectRatio="none">
-          <path d="${path}" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <div class="sc-scale">
-          <div class="sc-scale-ideal" style="left:${idealLeft}%;width:${idealWidth}%"></div>
-          <div class="sc-scale-marker" style="left:${markerPos}%"></div>
-        </div>
-        <div class="sc-scale-labels">
-          <span>${s.scaleMin}</span>
-          <span>ideal ${s.idealMin}–${s.idealMax}</span>
-          <span>${s.scaleMax}</span>
-        </div>
-      </div>`;
-  }).join("");
+function renderSystemStatus() {
+    if (state.hasReceivedData && state.systemStatus === 'OFFLINE') {
+        state.systemStatus = 'ONLINE';
+    }
+    
+    const isOnline = state.systemStatus === 'ONLINE' || state.systemStatus === 'NORMAL';
+    const isWarning = state.systemStatus === 'WARNING';
+    const isSensorError = state.systemStatus === 'SENSOR ERROR';
+    
+    if (DOM.sysStatusDot) {
+        if (isOnline) {
+            DOM.sysStatusDot.className = 'status-dot-lg online';
+        } else if (isWarning) {
+            DOM.sysStatusDot.className = 'status-dot-lg warning';
+            DOM.sysStatusDot.style.backgroundColor = 'var(--accent-amber)';
+            DOM.sysStatusDot.style.boxShadow = '0 0 12px var(--accent-amber)';
+        } else if (isSensorError) {
+            DOM.sysStatusDot.className = 'status-dot-lg offline';
+            DOM.sysStatusDot.style.backgroundColor = 'var(--accent-red)';
+            DOM.sysStatusDot.style.boxShadow = '0 0 12px var(--accent-red)';
+        } else {
+            DOM.sysStatusDot.className = 'status-dot-lg offline';
+            DOM.sysStatusDot.style.backgroundColor = 'var(--accent-red)';
+            DOM.sysStatusDot.style.boxShadow = '0 0 12px var(--accent-red)';
+        }
+    }
+    
+    if (DOM.sysStatusText) {
+        if (isOnline) {
+            DOM.sysStatusText.textContent = 'ONLINE';
+            DOM.sysStatusText.style.color = 'var(--accent-green)';
+        } else if (isWarning) {
+            DOM.sysStatusText.textContent = 'WARNING';
+            DOM.sysStatusText.style.color = 'var(--accent-amber)';
+        } else if (isSensorError) {
+            DOM.sysStatusText.textContent = 'SENSOR ERROR';
+            DOM.sysStatusText.style.color = 'var(--accent-red)';
+        } else {
+            DOM.sysStatusText.textContent = 'OFFLINE';
+            DOM.sysStatusText.style.color = 'var(--accent-red)';
+        }
+    }
+    
+    if (DOM.sysStatusSub) {
+        if (isOnline) {
+            DOM.sysStatusSub.textContent = 'All systems operating normally';
+        } else if (isWarning) {
+            DOM.sysStatusSub.textContent = '⚠️ Water level critical!';
+        } else if (isSensorError) {
+            DOM.sysStatusSub.textContent = '⚠️ Sensor error detected!';
+        } else {
+            DOM.sysStatusSub.textContent = 'Connection lost with MCU';
+        }
+    }
+    
+    if (DOM.sysStatusBadge) {
+        if (isOnline) {
+            DOM.sysStatusBadge.textContent = 'NORMAL';
+            DOM.sysStatusBadge.className = 'badge badge-success';
+        } else if (isWarning) {
+            DOM.sysStatusBadge.textContent = 'WARNING';
+            DOM.sysStatusBadge.className = 'badge badge-off';
+            DOM.sysStatusBadge.style.borderColor = 'var(--accent-amber)';
+            DOM.sysStatusBadge.style.color = 'var(--accent-amber)';
+        } else if (isSensorError) {
+            DOM.sysStatusBadge.textContent = 'SENSOR ERROR';
+            DOM.sysStatusBadge.className = 'badge badge-off';
+            DOM.sysStatusBadge.style.borderColor = 'var(--accent-red)';
+            DOM.sysStatusBadge.style.color = 'var(--accent-red)';
+        } else {
+            DOM.sysStatusBadge.textContent = 'ALERT';
+            DOM.sysStatusBadge.className = 'badge badge-off';
+        }
+    }
+    
+    if (DOM.headerSystemStatus) {
+        if (isOnline) {
+            DOM.headerSystemStatus.textContent = 'SYSTEM ONLINE';
+        } else if (isWarning) {
+            DOM.headerSystemStatus.textContent = 'SYSTEM WARNING';
+        } else if (isSensorError) {
+            DOM.headerSystemStatus.textContent = 'SENSOR ERROR';
+        } else {
+            DOM.headerSystemStatus.textContent = 'SYSTEM OFFLINE';
+        }
+    }
+    
+    if (DOM.headerStatusPill) {
+        if (isOnline) {
+            DOM.headerStatusPill.className = 'status-pill online';
+        } else if (isWarning) {
+            DOM.headerStatusPill.className = 'status-pill warning';
+            DOM.headerStatusPill.style.borderColor = 'rgba(245, 158, 11, 0.3)';
+            DOM.headerStatusPill.style.color = 'var(--accent-amber)';
+        } else {
+            DOM.headerStatusPill.className = 'status-pill offline';
+            DOM.headerStatusPill.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+            DOM.headerStatusPill.style.color = 'var(--accent-red)';
+        }
+    }
+    
+    if (DOM.headerStatusDot) {
+        DOM.headerStatusDot.className = `pulse-dot ${isOnline ? '' : 'offline'}`;
+        if (isWarning) {
+            DOM.headerStatusDot.style.backgroundColor = 'var(--accent-amber)';
+            DOM.headerStatusDot.style.boxShadow = '0 0 8px var(--accent-amber)';
+        } else if (isOnline) {
+            DOM.headerStatusDot.style.backgroundColor = 'var(--accent-green)';
+            DOM.headerStatusDot.style.boxShadow = '0 0 8px var(--accent-green)';
+        } else {
+            DOM.headerStatusDot.style.backgroundColor = 'var(--accent-red)';
+            DOM.headerStatusDot.style.boxShadow = '0 0 8px var(--accent-red)';
+        }
+    }
+    
+    if (DOM.dotSystem) {
+        DOM.dotSystem.className = `state-dot ${isOnline ? 'on' : isWarning ? 'warning' : 'off'}`;
+        if (isWarning) {
+            DOM.dotSystem.style.backgroundColor = 'var(--accent-amber)';
+            DOM.dotSystem.style.boxShadow = '0 0 8px var(--accent-amber)';
+        } else if (isOnline) {
+            DOM.dotSystem.style.backgroundColor = 'var(--accent-green)';
+            DOM.dotSystem.style.boxShadow = '0 0 8px var(--accent-green)';
+        } else {
+            DOM.dotSystem.style.backgroundColor = 'var(--text-dim)';
+            DOM.dotSystem.style.boxShadow = 'none';
+        }
+    }
+    
+    if (DOM.stateSystem) {
+        if (isOnline) {
+            DOM.stateSystem.textContent = 'NORMAL';
+            DOM.stateSystem.className = 'state-text active';
+            DOM.stateSystem.style.color = 'var(--accent-green)';
+        } else if (isWarning) {
+            DOM.stateSystem.textContent = 'WARNING';
+            DOM.stateSystem.className = 'state-text active';
+            DOM.stateSystem.style.color = 'var(--accent-amber)';
+        } else if (isSensorError) {
+            DOM.stateSystem.textContent = 'SENSOR ERROR';
+            DOM.stateSystem.className = 'state-text';
+            DOM.stateSystem.style.color = 'var(--accent-red)';
+        } else {
+            DOM.stateSystem.textContent = 'OFFLINE';
+            DOM.stateSystem.className = 'state-text';
+            DOM.stateSystem.style.color = 'var(--text-muted)';
+        }
+    }
+    
+    if (DOM.systemMCUStatus) {
+        if (isOnline) {
+            DOM.systemMCUStatus.textContent = 'ESP32 Status OK';
+            DOM.systemMCUStatus.style.color = 'var(--text-muted)';
+        } else if (isWarning) {
+            DOM.systemMCUStatus.textContent = '⚠️ Water Critical!';
+            DOM.systemMCUStatus.style.color = 'var(--accent-amber)';
+        } else if (isSensorError) {
+            DOM.systemMCUStatus.textContent = '⚠️ Sensor Error!';
+            DOM.systemMCUStatus.style.color = 'var(--accent-red)';
+        } else {
+            DOM.systemMCUStatus.textContent = 'ESP32 Offline';
+            DOM.systemMCUStatus.style.color = 'var(--text-dim)';
+        }
+    }
 }
 
-function renderPhPanel() {
-  const panel = document.getElementById("phPanel");
-  const ph = state.values.ph || 0;
-  const { min, max } = state.phTarget;
-  const inRange = ph >= min && max >= ph;
-  const stateColor = inRange
-    ? "color:var(--ok);background:var(--primary-soft)"
-    : ph < min
-    ? "color:#97650f;background:#fbf1dc"
-    : "color:var(--danger);background:var(--danger-soft)";
-  const stateText = inRange ? "Dalam rentang" : ph < min ? "Terlalu asam" : "Terlalu basa";
-  const f = state.fuzzy;
-
-  const presetOptions = ['<option value="custom">Target manual…</option>']
-    .concat(PLANT_PRESETS.map((p) => `<option value="${p.key}" ${state.preset === p.key ? "selected" : ""}>${p.name} (pH ${p.phMin}–${p.phMax})</option>`))
-    .join("");
-
-  const upActive = state.pumps.phUp;
-  const downActive = state.pumps.phDown;
-  const manual = state.phMode === "manual";
-
-  const fuzzyRows = [
-    ["Asam Kuat", f.memberships?.asamKuat ?? 0],
-    ["Asam Lemah", f.memberships?.asamLemah ?? 0],
-    ["Netral", f.memberships?.netral ?? 0],
-    ["Basa Lemah", f.memberships?.basaLemah ?? 0],
-    ["Basa Kuat", f.memberships?.basaKuat ?? 0],
-  ]
-    .map(
-      ([name, val]) => `
-      <div class="fuzzy-row">
-        <span class="fuzzy-name">${name}</span>
-        <span class="fuzzy-bar"><span class="fuzzy-fill" style="width:${(val * 100).toFixed(0)}%"></span></span>
-        <span class="fuzzy-pct">${(val * 100).toFixed(0)}%</span>
-      </div>`
-    )
-    .join("");
-
-  panel.innerHTML = `
-    <div class="ph-left">
-      <div class="ph-mode" role="radiogroup" aria-label="Mode kontrol pH">
-        <button role="radio" aria-checked="${state.phMode === "auto"}" class="${state.phMode === "auto" ? "active" : ""}" data-mode="auto">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.9 4.9l2.8 2.8M16.3 16.3l2.8 2.8M2 12h4M18 12h4M4.9 19.1l2.8-2.8M16.3 7.7l2.8-2.8"/></svg>
-          Auto
-        </button>
-        <button role="radio" aria-checked="${state.phMode === "manual"}" class="${manual ? "active" : ""}" data-mode="manual">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11V6a3 3 0 0 1 6 0v5M5 11h14l-1 9H6z"/></svg>
-          Manual
-        </button>
-      </div>
-
-      <div class="ph-readout">
-        <span class="val">${ph.toFixed(2)}</span>
-        <span class="ph-state" style="${stateColor}">${stateText}</span>
-      </div>
-
-      <div class="ph-target-box">
-        <label>Preset tanaman</label>
-        <select class="ph-select" id="presetSelect">${presetOptions}</select>
-        <div class="ph-target-row" style="margin-top:12px">
-          <input type="number" id="phMin" step="0.1" min="${PH_ALLOWED_MIN}" max="${PH_ALLOWED_MAX}" value="${min.toFixed(1)}" aria-label="pH minimum" />
-          <span>s/d</span>
-          <input type="number" id="phMax" step="0.1" min="${PH_ALLOWED_MIN}" max="${PH_ALLOWED_MAX}" value="${max.toFixed(1)}" aria-label="pH maksimum" />
-        </div>
-        <p class="ph-hint" style="margin-top:8px">Rentang aman larutan nutrisi: pH ${PH_ALLOWED_MIN}–${PH_ALLOWED_MAX}.</p>
-      </div>
-    </div>
-
-    <div class="ph-right">
-      <div class="fuzzy-box">
-        <h4>Derajat Keanggotaan Fuzzy · e = ${(ph - (min + max) / 2).toFixed(2)}</h4>
-        ${fuzzyRows}
-      </div>
-
-      <div class="dose-cards">
-        <div class="dose-card ${upActive ? "active" : ""}">
-          <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg> pH Up</h4>
-          <div class="chem">GPIO 10 · KOH 10%</div>
-          <div class="dose-status ${upActive ? "on" : ""}">${upActive ? "Mendosis…" : "Standby"}</div>
-          <button class="dose-btn ${upActive ? "on" : ""}" data-dose="phUp" ${manual ? "" : "disabled"}>${upActive ? "Matikan" : "Nyalakan"}</button>
-        </div>
-        <div class="dose-card ${downActive ? "active" : ""}">
-          <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg> pH Down</h4>
-          <div class="chem">GPIO 46 · H₃PO₄</div>
-          <div class="dose-status ${downActive ? "on" : ""}">${downActive ? "Mendosis…" : "Standby"}</div>
-          <button class="dose-btn ${downActive ? "on" : ""}" data-dose="phDown" ${manual ? "" : "disabled"}>${downActive ? "Matikan" : "Nyalakan"}</button>
-        </div>
-      </div>
-
-      <p class="ph-hint">${
-        manual
-          ? "Mode Manual: nyalakan pompa pH sesuai kebutuhan. Hanya satu pompa aktif dalam satu waktu."
-          : `Mode Auto (Fuzzy): sistem mengevaluasi pH dan mengatur dosis otomatis. Kekuatan dosis saat ini <strong>${(f.strength * 100).toFixed(0)}%</strong>.`
-      }</p>
-    </div>`;
-
-  // wire events
-  panel.querySelectorAll("[data-mode]").forEach((btn) =>
-    btn.addEventListener("click", () => setPhMode(btn.dataset.mode))
-  );
-  panel.querySelectorAll("[data-dose]").forEach((btn) =>
-    btn.addEventListener("click", () => togglePhManual(btn.dataset.dose))
-  );
-  const presetSel = panel.querySelector("#presetSelect");
-  presetSel && presetSel.addEventListener("change", (e) => applyPreset(e.target.value));
-  const phMinEl = panel.querySelector("#phMin");
-  const phMaxEl = panel.querySelector("#phMax");
-  [phMinEl, phMaxEl].forEach((el) =>
-    el.addEventListener("change", () => {
-      const mn = clamp(parseFloat(phMinEl.value), PH_ALLOWED_MIN, PH_ALLOWED_MAX);
-      const mx = clamp(parseFloat(phMaxEl.value), PH_ALLOWED_MIN, PH_ALLOWED_MAX);
-      state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
-      state.preset = "custom";
-      renderPhPanel();
-    })
-  );
+function renderSensorCards() {
+    if (DOM.valTemperature) {
+        DOM.valTemperature.textContent = state.temperature !== null ? state.temperature.toFixed(1) : '--';
+    }
+    if (DOM.statusTemperature) {
+        const temp = state.temperature;
+        if (temp === null) {
+            DOM.statusTemperature.textContent = '--';
+            DOM.statusTemperature.className = 'badge badge-off';
+        } else if (temp > 32) {
+            DOM.statusTemperature.textContent = 'High Temp';
+            DOM.statusTemperature.className = 'badge badge-off';
+            DOM.statusTemperature.style.borderColor = 'var(--accent-amber)';
+            DOM.statusTemperature.style.color = 'var(--accent-amber)';
+        } else if (temp < 20) {
+            DOM.statusTemperature.textContent = 'Low Temp';
+            DOM.statusTemperature.className = 'badge badge-off';
+            DOM.statusTemperature.style.borderColor = 'var(--accent-blue)';
+            DOM.statusTemperature.style.color = 'var(--accent-blue)';
+        } else {
+            DOM.statusTemperature.textContent = 'Normal';
+            DOM.statusTemperature.className = 'badge badge-outline-success';
+        }
+    }
+    
+    if (DOM.valHumidity) {
+        DOM.valHumidity.textContent = state.humidity !== null ? Math.round(state.humidity) : '--';
+    }
+    if (DOM.statusHumidity) {
+        const hum = state.humidity;
+        if (hum === null) {
+            DOM.statusHumidity.textContent = '--';
+            DOM.statusHumidity.className = 'badge badge-off';
+        } else if (hum < 40) {
+            DOM.statusHumidity.textContent = 'Low';
+            DOM.statusHumidity.className = 'badge badge-off';
+            DOM.statusHumidity.style.borderColor = 'var(--accent-amber)';
+            DOM.statusHumidity.style.color = 'var(--accent-amber)';
+        } else if (hum > 80) {
+            DOM.statusHumidity.textContent = 'High';
+            DOM.statusHumidity.className = 'badge badge-off';
+            DOM.statusHumidity.style.borderColor = 'var(--accent-blue)';
+            DOM.statusHumidity.style.color = 'var(--accent-blue)';
+        } else {
+            DOM.statusHumidity.textContent = 'Normal';
+            DOM.statusHumidity.className = 'badge badge-outline-success';
+        }
+    }
+    
+    if (DOM.valSoilMoisture) {
+        DOM.valSoilMoisture.textContent = state.soilMoisture !== null ? Math.round(state.soilMoisture) : '--';
+    }
+    if (DOM.barSoilMoisture) {
+        const val = state.soilMoisture !== null ? Math.min(100, Math.max(0, state.soilMoisture)) : 0;
+        DOM.barSoilMoisture.style.width = `${val}%`;
+    }
+    if (DOM.statusSoilMoisture) {
+        const val = state.soilMoisture;
+        if (val === null) {
+            DOM.statusSoilMoisture.textContent = '--';
+        } else if (val < 30) {
+            DOM.statusSoilMoisture.textContent = '🌵 Dry (Watering Needed)';
+            DOM.statusSoilMoisture.style.color = 'var(--accent-amber)';
+        } else if (val > 80) {
+            DOM.statusSoilMoisture.textContent = '💦 Wet';
+            DOM.statusSoilMoisture.style.color = 'var(--accent-blue)';
+        } else {
+            DOM.statusSoilMoisture.textContent = '🌱 Good';
+            DOM.statusSoilMoisture.style.color = 'var(--text-muted)';
+        }
+    }
+    
+    if (DOM.valWaterLevel) {
+        if (state.waterLevel !== null && state.waterLevel >= 0) {
+            DOM.valWaterLevel.textContent = Math.round(state.waterLevel);
+        } else {
+            DOM.valWaterLevel.textContent = 'ERR';
+        }
+    }
+    if (DOM.barWaterLevel) {
+        const val = state.waterLevel !== null && state.waterLevel >= 0 ? Math.min(100, Math.max(0, state.waterLevel)) : 0;
+        DOM.barWaterLevel.style.width = `${val}%`;
+    }
+    if (DOM.statusWaterLevel) {
+        const val = state.waterLevel;
+        if (val === null || val < 0) {
+            DOM.statusWaterLevel.textContent = '⚠️ Sensor Error!';
+            DOM.statusWaterLevel.style.color = 'var(--accent-red)';
+        } else if (val < 20) {
+            DOM.statusWaterLevel.textContent = '🔴 Critical! Water Low';
+            DOM.statusWaterLevel.style.color = 'var(--accent-red)';
+        } else if (val < 40) {
+            DOM.statusWaterLevel.textContent = '🟡 Low Water';
+            DOM.statusWaterLevel.style.color = 'var(--accent-amber)';
+        } else {
+            DOM.statusWaterLevel.textContent = '✅ Good';
+            DOM.statusWaterLevel.style.color = 'var(--text-muted)';
+        }
+    }
 }
 
-function renderPumps() {
-  const container = document.getElementById("pumpGroups");
-  container.innerHTML = PUMP_GROUP_ORDER.map((group) => {
-    const rows = PUMPS.filter((p) => p.group === group)
-      .map((p) => {
-        const on = state.pumps[p.key] || false;
-        return `
-        <div class="pump-row">
-          <div class="pump-info">
-            <span class="pump-ic ${on ? "on" : ""}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${PUMP_ICON}</svg></span>
-            <div>
-              <div class="pump-name">${p.name}</div>
-              <div class="pump-pin">GPIO ${p.pin}</div>
+function renderEnvironmentSummary() {
+    if (DOM.envTemp) {
+        DOM.envTemp.textContent = state.temperature !== null ? `${state.temperature.toFixed(1)} °C` : '-- °C';
+    }
+    if (DOM.envHumidity) {
+        DOM.envHumidity.textContent = state.humidity !== null ? `${Math.round(state.humidity)} %` : '-- %';
+    }
+    if (DOM.envLight) {
+        DOM.envLight.textContent = state.light || '--';
+    }
+    if (DOM.envSoil) {
+        DOM.envSoil.textContent = state.soilMoisture !== null ? `${Math.round(state.soilMoisture)} %` : '-- %';
+    }
+    if (DOM.envWater) {
+        DOM.envWater.textContent = state.waterLevel !== null && state.waterLevel >= 0 ? `${Math.round(state.waterLevel)} %` : 'ERR';
+    }
+}
+
+function renderActuators() {
+    if (DOM.statePump) {
+        DOM.statePump.textContent = state.pump ? 'MENYALA' : 'MATI';
+        DOM.statePump.className = state.pump ? 'state-text active' : 'state-text';
+    }
+    syncPumpToggle();
+    
+    if (DOM.iconBoxPump) {
+        DOM.iconBoxPump.classList.toggle('active-glow', state.pump);
+    }
+    if (DOM.modeTextPump) {
+        DOM.modeTextPump.textContent = state.autoMode ? 'Mode: Otomatis' : 'Mode: Manual (Pengguna)';
+    }
+    
+    if (DOM.stateLamp) {
+        DOM.stateLamp.textContent = state.lamp ? 'MENYALA' : 'MATI';
+        DOM.stateLamp.className = state.lamp ? 'state-text active' : 'state-text';
+    }
+    syncLampToggle();
+    
+    if (DOM.iconBoxLamp) {
+        DOM.iconBoxLamp.classList.toggle('active-glow-amber', state.lamp);
+    }
+    if (DOM.modeTextLamp) {
+        DOM.modeTextLamp.textContent = state.autoMode ? 'Mode: Otomatis' : 'Mode: Manual (Pengguna)';
+    }
+    
+    if (DOM.stateBuzzer) {
+        DOM.stateBuzzer.textContent = state.buzzer ? 'MENYALA' : 'MATI';
+        DOM.stateBuzzer.className = state.buzzer ? 'state-text active' : 'state-text';
+    }
+    if (DOM.toggleBuzzerManual) {
+        DOM.toggleBuzzerManual.checked = state.buzzer;
+    }
+    if (DOM.iconBoxBuzzer) {
+        DOM.iconBoxBuzzer.classList.toggle('active-glow', state.buzzer);
+    }
+}
+
+function renderAutomationPanel() {
+    if (DOM.toggleGlobalAuto) {
+        DOM.toggleGlobalAuto.checked = state.autoMode;
+    }
+    if (DOM.badgeGlobalAuto) {
+        DOM.badgeGlobalAuto.textContent = state.autoMode ? 'AKTIF' : 'NONAKTIF';
+        DOM.badgeGlobalAuto.style.color = state.autoMode ? 'var(--accent-green)' : 'var(--text-muted)';
+    }
+    
+    if (DOM.badgePumpMode) {
+        DOM.badgePumpMode.textContent = state.autoMode ? 'Mode: Otomatis' : 'Mode: Manual (User Override)';
+        DOM.badgePumpMode.className = `badge-mode-pill ${state.autoMode ? 'auto' : 'manual'}`;
+    }
+    
+    if (DOM.badgeLampMode) {
+        DOM.badgeLampMode.textContent = state.autoMode ? 'Mode: Otomatis' : 'Mode: Manual (User Override)';
+        DOM.badgeLampMode.className = `badge-mode-pill ${state.autoMode ? 'auto' : 'manual'}`;
+    }
+    
+    if (DOM.autoSoilCurrent) {
+        DOM.autoSoilCurrent.textContent = state.soilMoisture !== null ? `${Math.round(state.soilMoisture)} %` : '-- %';
+    }
+    if (DOM.autoSoilPumpStatus) {
+        DOM.autoSoilPumpStatus.textContent = state.pump ? 'MENYALA (ON)' : 'MATI (OFF)';
+        DOM.autoSoilPumpStatus.className = `badge ${state.pump ? 'badge-on' : 'badge-off'}`;
+    }
+    if (DOM.autoLightStatus) {
+        DOM.autoLightStatus.textContent = state.light || '--';
+    }
+    if (DOM.autoLightLampStatus) {
+        DOM.autoLightLampStatus.textContent = state.lamp ? 'MENYALA (ON)' : 'MATI (OFF)';
+        DOM.autoLightLampStatus.className = `badge ${state.lamp ? 'badge-on' : 'badge-off'}`;
+    }
+    
+    if (DOM.cardControlPump) {
+        DOM.cardControlPump.classList.toggle('device-active-pump', state.pump);
+    }
+    if (DOM.cardControlLamp) {
+        DOM.cardControlLamp.classList.toggle('device-active-lamp', state.lamp);
+    }
+}
+
+function syncPumpToggle() {
+    if (DOM.togglePumpManual) DOM.togglePumpManual.checked = state.pump;
+    if (DOM.togglePumpCard) DOM.togglePumpCard.checked = state.pump;
+}
+
+function syncLampToggle() {
+    if (DOM.toggleLampManual) DOM.toggleLampManual.checked = state.lamp;
+    if (DOM.toggleLampCard) DOM.toggleLampCard.checked = state.lamp;
+}
+
+function updateLastTimestamp() {
+    const now = new Date();
+    const timeStr = now.toTimeString().split(' ')[0];
+    
+    if (DOM.sysStatusTime) DOM.sysStatusTime.textContent = timeStr;
+    if (DOM.lastUpdateTime) DOM.lastUpdateTime.textContent = timeStr;
+}
+
+// ==================== CHART ====================
+function initChart() {
+    const canvas = document.getElementById('environmentChart');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    
+    const initialLabels = Array(30).fill('--');
+    const initialData = Array(30).fill(0);
+    
+    chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: initialLabels,
+            datasets: [{
+                label: 'Temperature (°C)',
+                data: initialData,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 2,
+                pointBackgroundColor: '#10b981',
+                pointHoverRadius: 5
+            }, {
+                label: 'Soil Moisture (%)',
+                data: initialData,
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 2,
+                pointRadius: 2,
+                pointBackgroundColor: '#38bdf8',
+                pointHoverRadius: 5,
+                hidden: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#9ca3af',
+                        font: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 11
+                        }
+                    }
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                    titleColor: '#f3f4f6',
+                    bodyColor: '#9ca3af',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    padding: 10,
+                    cornerRadius: 8
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: {
+                        color: '#6b7280',
+                        maxTicksLimit: 10,
+                        font: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 10
+                        }
+                    }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: {
+                        color: '#6b7280',
+                        font: {
+                            family: "'JetBrains Mono', monospace",
+                            size: 10
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+
+    const tabs = document.querySelectorAll('.chart-tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            const target = tab.dataset.target;
+            const dataset1 = chartInstance.data.datasets[0];
+            const dataset2 = chartInstance.data.datasets[1];
+            
+            if (target === 'temp') {
+                dataset1.hidden = false;
+                dataset2.hidden = true;
+                dataset1.label = 'Temperature (°C)';
+            } else if (target === 'soil') {
+                dataset1.hidden = true;
+                dataset2.hidden = false;
+                dataset2.label = 'Soil Moisture (%)';
+            }
+            chartInstance.update();
+        });
+    });
+    
+    chartInstance.data.datasets[1].hidden = true;
+    chartInstance.update();
+}
+
+function updateChartData(temp, soil) {
+    if (!chartInstance) return;
+    
+    const now = new Date();
+    const label = now.getHours().toString().padStart(2, '0') + ':' + 
+                  now.getMinutes().toString().padStart(2, '0');
+    
+    if (state.chartLabels.length >= state.maxChartPoints) {
+        state.chartLabels.shift();
+        state.chartTempData.shift();
+        state.chartSoilData.shift();
+    }
+    
+    state.chartLabels.push(label);
+    if (temp !== null) state.chartTempData.push(temp);
+    if (soil !== null) state.chartSoilData.push(soil);
+    
+    chartInstance.data.labels = state.chartLabels;
+    chartInstance.data.datasets[0].data = state.chartTempData;
+    chartInstance.data.datasets[1].data = state.chartSoilData;
+    chartInstance.update('none');
+}
+
+// ==================== MANUAL CONTROLS ====================
+function initManualControls() {
+    [DOM.togglePumpManual, DOM.togglePumpCard].forEach(toggle => {
+        if (toggle) {
+            toggle.addEventListener('change', (e) => {
+                const value = e.target.checked ? 'ON' : 'OFF';
+                if (publishControl(MQTT_CONFIG.topics.controlPump, value)) {
+                    if (state.autoMode) {
+                        state.autoMode = false;
+                        publishControl(MQTT_CONFIG.topics.controlAuto, 'OFF');
+                        renderAll();
+                        showToast('Mode Otomatis dinonaktifkan (manual override)', 'info');
+                    }
+                } else {
+                    e.target.checked = !e.target.checked;
+                }
+            });
+        }
+    });
+    
+    [DOM.toggleLampManual, DOM.toggleLampCard].forEach(toggle => {
+        if (toggle) {
+            toggle.addEventListener('change', (e) => {
+                const value = e.target.checked ? 'ON' : 'OFF';
+                if (publishControl(MQTT_CONFIG.topics.controlLamp, value)) {
+                    if (state.autoMode) {
+                        state.autoMode = false;
+                        publishControl(MQTT_CONFIG.topics.controlAuto, 'OFF');
+                        renderAll();
+                        showToast('Mode Otomatis dinonaktifkan (manual override)', 'info');
+                    }
+                } else {
+                    e.target.checked = !e.target.checked;
+                }
+            });
+        }
+    });
+    
+    if (DOM.toggleBuzzerManual) {
+        DOM.toggleBuzzerManual.addEventListener('change', (e) => {
+            const value = e.target.checked ? 'ON' : 'OFF';
+            if (!publishControl(MQTT_CONFIG.topics.controlBuzzer, value)) {
+                e.target.checked = !e.target.checked;
+            }
+        });
+    }
+    
+    if (DOM.btnQuickWater) {
+        DOM.btnQuickWater.addEventListener('click', () => {
+            if (state.quickWaterActive) {
+                state.quickWaterActive = false;
+                if (quickWaterTimer) {
+                    clearInterval(quickWaterTimer);
+                    quickWaterTimer = null;
+                }
+                publishControl(MQTT_CONFIG.topics.controlPump, 'OFF');
+                if (DOM.labelQuickWater) DOM.labelQuickWater.textContent = '💦 Siram Cepat (5 Detik)';
+                showToast('⏹️ Penyiraman manual dihentikan.', 'info');
+                return;
+            }
+            
+            if (state.waterLevel !== null && state.waterLevel <= 20) {
+                showToast('⚠️ Water level critical! Cannot start watering.', 'warning');
+                return;
+            }
+            
+            const duration = 5;
+            if (publishControl(MQTT_CONFIG.topics.controlQuick, String(duration))) {
+                state.quickWaterActive = true;
+                
+                if (state.autoMode) {
+                    state.autoMode = false;
+                    publishControl(MQTT_CONFIG.topics.controlAuto, 'OFF');
+                    renderAll();
+                }
+                
+                let countdown = duration;
+                if (DOM.labelQuickWater) DOM.labelQuickWater.textContent = `⏳ Menyiram... (${countdown}s)`;
+                showToast(`💦 Siram Cepat ${duration} Detik dimulai...`, 'info');
+                
+                if (quickWaterTimer) clearInterval(quickWaterTimer);
+                quickWaterTimer = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        if (DOM.labelQuickWater) DOM.labelQuickWater.textContent = `⏳ Menyiram... (${countdown}s)`;
+                    } else {
+                        clearInterval(quickWaterTimer);
+                        quickWaterTimer = null;
+                        state.quickWaterActive = false;
+                        if (DOM.labelQuickWater) DOM.labelQuickWater.textContent = '💦 Siram Cepat (5 Detik)';
+                        showToast('✅ Penyiraman manual selesai!', 'success');
+                    }
+                }, 1000);
+            }
+        });
+    }
+    
+    if (DOM.btnToggleLamp) {
+        DOM.btnToggleLamp.addEventListener('click', () => {
+            const newState = !state.lamp;
+            const value = newState ? 'ON' : 'OFF';
+            if (publishControl(MQTT_CONFIG.topics.controlLamp, value)) {
+                if (state.autoMode) {
+                    state.autoMode = false;
+                    publishControl(MQTT_CONFIG.topics.controlAuto, 'OFF');
+                    renderAll();
+                }
+                showToast(`💡 Lampu ${newState ? 'DINYALAKAN' : 'DIMATIKAN'}`, 'info');
+            }
+        });
+    }
+    
+    if (DOM.toggleGlobalAuto) {
+        DOM.toggleGlobalAuto.addEventListener('change', (e) => {
+            const value = e.target.checked ? 'ON' : 'OFF';
+            state.autoMode = e.target.checked;
+            if (publishControl(MQTT_CONFIG.topics.controlAuto, value)) {
+                renderAll();
+                showToast(state.autoMode ? '🤖 Mode Otomatis Diaktifkan' : '🖐️ Mode Manual Diaktifkan', 'info');
+            } else {
+                e.target.checked = !e.target.checked;
+                state.autoMode = e.target.checked;
+            }
+        });
+    }
+}
+
+// ==================== RECONNECT BUTTON ====================
+function initReconnectButton() {
+    if (DOM.btnReconnectMQTT) {
+        DOM.btnReconnectMQTT.addEventListener('click', () => {
+            showToast('🔄 Reconnecting MQTT...', 'info');
+            if (mqttClient) {
+                mqttClient.end(true);
+            }
+            if (reconnectTimeout) clearTimeout(reconnectTimeout);
+            setTimeout(() => {
+                initMQTT();
+            }, 1000);
+        });
+    }
+}
+
+// ==================== CAMERA STATUS UPDATE ====================
+
+function updateCameraStatus(data) {
+    const status = data.status || 'UNKNOWN';
+    const cameraReady = data.camera_ready || false;
+    
+    console.log('📷 Updating camera status:', status);
+    
+    if (DOM.cameraStatusBadge) {
+        if (status === 'ONLINE' && cameraReady) {
+            DOM.cameraStatusBadge.textContent = 'CAMERA READY';
+            DOM.cameraStatusBadge.className = 'badge badge-success';
+            DOM.cameraStatusBadge.style.borderColor = '';
+            DOM.cameraStatusBadge.style.color = '';
+        } else if (status === 'CAPTURING') {
+            DOM.cameraStatusBadge.textContent = '📸 CAPTURING';
+            DOM.cameraStatusBadge.className = 'badge badge-off';
+            DOM.cameraStatusBadge.style.borderColor = 'var(--accent-amber)';
+            DOM.cameraStatusBadge.style.color = 'var(--accent-amber)';
+        } else if (status === 'OK') {
+            DOM.cameraStatusBadge.textContent = '✅ READY';
+            DOM.cameraStatusBadge.className = 'badge badge-success';
+        } else if (status === 'ERROR') {
+            DOM.cameraStatusBadge.textContent = '❌ ERROR';
+            DOM.cameraStatusBadge.className = 'badge badge-off';
+            DOM.cameraStatusBadge.style.borderColor = 'var(--accent-red)';
+            DOM.cameraStatusBadge.style.color = 'var(--accent-red)';
+        } else {
+            DOM.cameraStatusBadge.textContent = status;
+            DOM.cameraStatusBadge.className = 'badge badge-off';
+        }
+    }
+    
+    if (DOM.cameraMetaStatus) {
+        if (status === 'ONLINE' && cameraReady) {
+            DOM.cameraMetaStatus.textContent = 'READY';
+            DOM.cameraMetaStatus.className = 'meta-val status-online';
+            DOM.cameraMetaStatus.style.color = '';
+        } else if (status === 'OK') {
+            DOM.cameraMetaStatus.textContent = 'OK';
+            DOM.cameraMetaStatus.className = 'meta-val status-online';
+            DOM.cameraMetaStatus.style.color = '';
+        } else if (status === 'ERROR') {
+            DOM.cameraMetaStatus.textContent = 'ERROR';
+            DOM.cameraMetaStatus.className = 'meta-val';
+            DOM.cameraMetaStatus.style.color = 'var(--accent-red)';
+        } else {
+            DOM.cameraMetaStatus.textContent = status;
+            DOM.cameraMetaStatus.className = 'meta-val';
+            DOM.cameraMetaStatus.style.color = '';
+        }
+    }
+}
+
+// ==================== CAMERA MODULE ====================
+function initCameraModule() {
+    if (DOM.btnCaptureImage) {
+        DOM.btnCaptureImage.addEventListener('click', captureImage);
+    }
+    
+    if (DOM.btnClearRecent) {
+        DOM.btnClearRecent.addEventListener('click', clearRecentCaptures);
+    }
+    
+    if (DOM.modalClose) {
+        DOM.modalClose.addEventListener('click', () => {
+            DOM.imageModal.classList.add('hidden');
+        });
+    }
+    
+    if (DOM.imageModal) {
+        DOM.imageModal.addEventListener('click', (e) => {
+            if (e.target === DOM.imageModal) {
+                DOM.imageModal.classList.add('hidden');
+            }
+        });
+    }
+}
+
+// ==================== CAPTURE IMAGE - VIA HTTP ====================
+function captureImage() {
+    // Show loading
+    if (DOM.cameraLoading) DOM.cameraLoading.classList.remove('hidden');
+    if (DOM.cameraPlaceholder) DOM.cameraPlaceholder.classList.add('hidden');
+    if (DOM.cameraCanvas) DOM.cameraCanvas.classList.add('hidden');
+    if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = true;
+    
+    // Kirim perintah capture via MQTT
+    const published = publishControl(MQTT_CONFIG.topics.cameraCapture, 'CAPTURE');
+    
+    if (!published) {
+        // Fallback: simulasi jika MQTT tidak konek
+        setTimeout(() => {
+            if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+            if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+            showToast('⚠️ MQTT not connected, using simulation', 'warning');
+            simulateCapture();
+        }, 1500);
+        return;
+    }
+    
+    showToast('📸 Capture command sent to ESP32-CAM', 'info');
+    
+    if (DOM.cameraStatusBadge) {
+        DOM.cameraStatusBadge.textContent = '📤 SENT';
+        DOM.cameraStatusBadge.className = 'badge badge-off';
+        DOM.cameraStatusBadge.style.borderColor = 'var(--accent-amber)';
+        DOM.cameraStatusBadge.style.color = 'var(--accent-amber)';
+    }
+    
+    // ==========================================================
+    // AMBIL GAMBAR VIA HTTP
+    // ==========================================================
+    
+    // Tunggu 2 detik agar ESP32-CAM selesai capture
+    setTimeout(() => {
+        // Ambil gambar dari ESP32-CAM via HTTP
+        const espIP = state.espCamIP;
+        const imgUrl = `http://${espIP}/capture?t=${Date.now()}`;
+        
+        console.log('📸 Fetching image from:', imgUrl);
+        
+        const canvas = DOM.cameraCanvas;
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = function() {
+            console.log('✅ Image loaded from ESP32-CAM!');
+            console.log('📐 Image size:', img.width, 'x', img.height);
+            
+            // Set canvas size sesuai gambar
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            // Gambar dengan background putih
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            // Tampilkan canvas
+            canvas.classList.remove('hidden');
+            if (DOM.cameraPlaceholder) DOM.cameraPlaceholder.classList.add('hidden');
+            if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+            if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+            
+            // Update status
+            if (DOM.cameraStatusBadge) {
+                DOM.cameraStatusBadge.textContent = 'IMAGE READY';
+                DOM.cameraStatusBadge.className = 'badge badge-success';
+                DOM.cameraStatusBadge.style.borderColor = '';
+                DOM.cameraStatusBadge.style.color = '';
+            }
+            if (DOM.cameraMetaStatus) {
+                DOM.cameraMetaStatus.textContent = 'IMAGE RECEIVED';
+                DOM.cameraMetaStatus.className = 'meta-val status-online';
+                DOM.cameraMetaStatus.style.color = '';
+            }
+            
+            // Tambahkan ke gallery
+            const timeStr = new Date().toTimeString().split(' ')[0];
+            addRecentCapture({
+                id: Date.now(),
+                image: canvas.toDataURL('image/jpeg', 0.9),
+                timestamp: timeStr,
+                temp: state.temperature,
+                moisture: state.soilMoisture
+            });
+            
+            showToast('📸 Image captured from ESP32-CAM!', 'success');
+            console.log('✅ Display complete!');
+        };
+        
+        img.onerror = function(e) {
+            console.error('❌ Failed to load image from ESP32-CAM:', e);
+            console.error('❌ URL:', imgUrl);
+            
+            if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+            if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+            if (DOM.cameraStatusBadge) {
+                DOM.cameraStatusBadge.textContent = 'HTTP ERROR';
+                DOM.cameraStatusBadge.className = 'badge badge-off';
+                DOM.cameraStatusBadge.style.borderColor = 'var(--accent-red)';
+                DOM.cameraStatusBadge.style.color = 'var(--accent-red)';
+            }
+            
+            showToast('❌ Failed to load image from ESP32-CAM', 'error');
+        };
+        
+        img.src = imgUrl;
+        console.log('📸 Image request sent to ESP32-CAM');
+        
+    }, 2500); // Tunggu 2.5 detik agar ESP32-CAM selesai capture
+}
+
+// ==================== SIMULATE CAPTURE (FALLBACK) ====================
+function simulateCapture() {
+    if (DOM.cameraLoading) DOM.cameraLoading.classList.add('hidden');
+    if (DOM.btnCaptureImage) DOM.btnCaptureImage.disabled = false;
+    
+    const canvas = DOM.cameraCanvas;
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    const bgGrad = ctx.createLinearGradient(0, 0, w, h);
+    bgGrad.addColorStop(0, '#0f172a');
+    bgGrad.addColorStop(0.5, '#064e3b');
+    bgGrad.addColorStop(1, '#022c22');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, w, h);
+    
+    ctx.fillStyle = '#1c1917';
+    ctx.beginPath();
+    ctx.ellipse(w / 2, h - 40, w / 3, 40, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 12;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(w / 2, h - 40);
+    ctx.quadraticCurveTo(w / 2 - 30, h / 2 + 20, w / 2, 90);
+    ctx.stroke();
+    
+    const drawLeaf = (cx, cy, rx, ry, angle, color) => {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle * Math.PI / 180);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    };
+    
+    drawLeaf(w / 2 - 50, h / 2, 60, 25, -30, '#16a34a');
+    drawLeaf(w / 2 + 55, h / 2 - 30, 70, 30, 25, '#22c55e');
+    drawLeaf(w / 2 - 60, h / 2 - 70, 65, 25, -45, '#4ade80');
+    drawLeaf(w / 2 + 45, h / 2 - 100, 55, 22, 35, '#15803d');
+    drawLeaf(w / 2, 70, 45, 20, 0, '#86efac');
+    
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(w / 2 + 30, h / 2 + 10, 16, 0, Math.PI * 2);
+    ctx.arc(w / 2 - 25, h / 2 - 40, 14, 0, Math.PI * 2);
+    ctx.fill();
+    
+    const margin = 20;
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.4)';
+    ctx.lineWidth = 1.5;
+    
+    const bSize = 24;
+    ctx.beginPath(); ctx.moveTo(margin, margin + bSize); ctx.lineTo(margin, margin); ctx.lineTo(margin + bSize, margin); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - margin - bSize, margin); ctx.lineTo(w - margin, margin); ctx.lineTo(w - margin, margin + bSize); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(margin, h - margin - bSize); ctx.lineTo(margin, h - margin); ctx.lineTo(margin + bSize, h - margin); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(w - margin - bSize, h - margin); ctx.lineTo(w - margin, h - margin); ctx.lineTo(w - margin, h - margin - bSize); ctx.stroke();
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillRect(margin + 10, margin + 10, 220, 55);
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.5)';
+    ctx.strokeRect(margin + 10, margin + 10, 220, 55);
+    
+    ctx.fillStyle = '#34d399';
+    ctx.font = '12px "JetBrains Mono", monospace';
+    const timeStr = new Date().toTimeString().split(' ')[0];
+    ctx.fillText(`CAM: ESP32-CAM [1080p]`, margin + 20, margin + 28);
+    ctx.fillText(`TIME: ${timeStr}`, margin + 20, margin + 44);
+    ctx.fillText(`TEMP: ${state.temperature || '--'}°C  SOIL: ${state.soilMoisture || '--'}%`, margin + 20, margin + 58);
+    
+    canvas.classList.remove('hidden');
+    if (DOM.cameraPlaceholder) DOM.cameraPlaceholder.classList.add('hidden');
+    
+    const dataUrl = canvas.toDataURL('image/png');
+    addRecentCapture({
+        id: Date.now(),
+        image: dataUrl,
+        timestamp: timeStr,
+        temp: state.temperature,
+        moisture: state.soilMoisture
+    });
+    
+    if (DOM.cameraStatusBadge) {
+        DOM.cameraStatusBadge.textContent = 'SIMULATED';
+        DOM.cameraStatusBadge.className = 'badge badge-success';
+    }
+    if (DOM.cameraMetaStatus) {
+        DOM.cameraMetaStatus.textContent = 'SIMULATED';
+        DOM.cameraMetaStatus.className = 'meta-val status-online';
+    }
+    
+    showToast('📸 Simulated capture (MQTT not connected)', 'warning');
+}
+
+// ==================== RECENT CAPTURES ====================
+function addRecentCapture(capture) {
+    recentCaptures.unshift(capture);
+    if (recentCaptures.length > 3) {
+        recentCaptures.pop();
+    }
+    renderRecentCaptures();
+}
+
+function renderRecentCaptures() {
+    const gallery = DOM.recentGallery;
+    if (!gallery) return;
+    
+    if (recentCaptures.length === 0) {
+        gallery.innerHTML = `
+            <div class="gallery-empty">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <p>Belum ada foto tersimpan dalam memory</p>
             </div>
-          </div>
-          <label class="switch">
-            <input type="checkbox" ${on ? "checked" : ""} data-pump="${p.key}" aria-label="${on ? "Matikan" : "Nyalakan"} pompa ${p.name}" />
-            <span class="slider"></span>
-          </label>
-        </div>`;
-      })
-      .join("");
-    return `<div class="pump-group"><h3>${group}</h3>${rows}</div>`;
-  }).join("");
-
-  container.querySelectorAll("[data-pump]").forEach((input) =>
-    input.addEventListener("change", (e) => togglePump(e.target.dataset.pump, e.target.checked))
-  );
-
-  const active = Object.values(state.pumps).filter(Boolean).length;
-  document.getElementById("activePumps").textContent = active;
+        `;
+        return;
+    }
+    
+    gallery.innerHTML = recentCaptures.map((cap, index) => `
+        <div class="gallery-item" data-index="${index}">
+            <div class="gallery-img-wrap">
+                <img src="${cap.image}" alt="Plant Capture ${cap.timestamp}">
+                <span class="gallery-badge">#${index + 1}</span>
+            </div>
+            <div class="gallery-info">
+                <span class="gallery-time">${cap.timestamp}</span>
+                <span class="gallery-meta">${cap.temp !== null ? cap.temp.toFixed(1) : '--'}°C • Moisture ${cap.moisture !== null ? cap.moisture : '--'}%</span>
+            </div>
+        </div>
+    `).join('');
+    
+    const items = gallery.querySelectorAll('.gallery-item');
+    items.forEach(item => {
+        item.addEventListener('click', () => {
+            const idx = parseInt(item.dataset.index);
+            openModal(recentCaptures[idx]);
+        });
+    });
 }
 
-function clamp(v, a, b) {
-  if (isNaN(v)) return a;
-  return Math.max(a, Math.min(b, v));
+function clearRecentCaptures() {
+    recentCaptures = [];
+    renderRecentCaptures();
+    showToast('🗑️ Gallery cleared', 'info');
 }
 
-// ==================== ACTIONS ====================
-function togglePump(key, val) {
-  state.pumps[key] = val;
-  const pump = PUMPS.find(p => p.key === key);
-  if (pump) {
-    publishControl(pump.controlTopic, val ? "ON" : "OFF");
-  }
-  renderPumps();
-}
-
-function setPhMode(mode) {
-  state.phMode = mode;
-  if (mode === "manual") {
-    state.pumps.phUp = false;
-    state.pumps.phDown = false;
-    publishControl('hydroponic/control/phup', "OFF");
-    publishControl('hydroponic/control/phdown', "OFF");
-  }
-  renderPhPanel();
-}
-
-function togglePhManual(pump) {
-  const next = !state.pumps[pump];
-  state.pumps.phUp = pump === "phUp" ? next : false;
-  state.pumps.phDown = pump === "phDown" ? next : false;
-  
-  if (pump === "phUp") {
-    publishControl('hydroponic/control/phup', next ? "ON" : "OFF");
-  } else if (pump === "phDown") {
-    publishControl('hydroponic/control/phdown', next ? "ON" : "OFF");
-  }
-  renderPhPanel();
-}
-
-function applyPreset(key) {
-  state.preset = key;
-  const p = PLANT_PRESETS.find((x) => x.key === key);
-  if (p) state.phTarget = { min: p.phMin, max: p.phMax };
-  renderPhPanel();
-}
-
-// ==================== CLOCK & UPTIME ====================
-function pad(n) {
-  return String(n).padStart(2, "0");
-}
-
-function tickClock() {
-  const now = new Date();
-  document.getElementById("clock").textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  document.getElementById("pktCount").textContent = state.packets.toLocaleString("id-ID");
-  if (state.broker === "online") {
-    const s = Math.floor((Date.now() - state.startTime) / 1000);
-    document.getElementById("uptime").textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-  } else {
-    document.getElementById("uptime").textContent = "00:00:00";
-  }
+function openModal(capture) {
+    if (!DOM.imageModal || !DOM.modalImage) return;
+    
+    DOM.modalImage.src = capture.image;
+    if (DOM.modalTimestamp) {
+        DOM.modalTimestamp.textContent = `Timestamp: ${capture.timestamp}`;
+    }
+    if (DOM.modalMeta) {
+        DOM.modalMeta.textContent = `Camera: ESP32-CAM • Temp: ${capture.temp !== null ? capture.temp.toFixed(1) : '--'}°C • Moisture: ${capture.moisture !== null ? capture.moisture : '--'}%`;
+    }
+    DOM.imageModal.classList.remove('hidden');
 }
 
 // ==================== TOAST ====================
 function showToast(message, type = 'info') {
-    const container = document.getElementById('toastContainer');
-    if (!container) {
-        const div = document.createElement('div');
-        div.id = 'toastContainer';
-        div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
-        document.body.appendChild(div);
-        return showToast(message, type);
-    }
+    const container = DOM.toastContainer;
+    if (!container) return;
     
     const toast = document.createElement('div');
-    const colors = {
-        success: '#10b981',
-        error: '#ef4444',
-        warning: '#f59e0b',
-        info: '#3b82f6'
-    };
-    toast.style.cssText = `
-        padding: 12px 20px;
-        border-radius: 8px;
-        color: white;
-        background: ${colors[type] || '#6b7280'};
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        font-size: 14px;
-        font-weight: 500;
-        animation: slideIn 0.3s ease;
-        max-width: 400px;
+    toast.className = `toast-item toast-${type}`;
+    
+    let icon = 'ℹ️';
+    if (type === 'warning') icon = '⚠️';
+    if (type === 'success') icon = '✅';
+    if (type === 'error') icon = '❌';
+    if (type === 'info') icon = '📡';
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icon}</span>
+        <span class="toast-text">${message}</span>
     `;
-    toast.textContent = message;
+    
     container.appendChild(toast);
     
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transition = 'opacity 0.3s';
+        toast.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        toast.classList.remove('show');
         setTimeout(() => toast.remove(), 300);
     }, 3500);
 }
 
-// ==================== RECONNECT ====================
-document.getElementById("reconnectBtn").addEventListener("click", () => {
-  if (state.broker === "online") {
-    if (mqttClient) {
-      mqttClient.end();
-    }
-    state.broker = "offline";
-    state.mqttConnected = false;
-    renderConnStatus();
-    showToast('🔌 Disconnected from MQTT', 'info');
-  } else {
-    // Reset to first broker
-    CURRENT_BROKER_INDEX = 0;
-    Object.defineProperty(MQTT_CONFIG, 'broker', {
-        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker; }
-    });
-    Object.defineProperty(MQTT_CONFIG, 'brokerName', {
-        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].name; }
-    });
-    connectMQTT();
-    showToast('🔄 Connecting to ' + MQTT_CONFIG.brokerName + '...', 'info');
-  }
-});
+// ==================== EXPOSE FOR DEBUG ====================
+window.debug = {
+    state: state,
+    MQTT_CONFIG: MQTT_CONFIG,
+    mqttClient: mqttClient,
+    DOM: DOM,
+    recentCaptures: recentCaptures,
+    publishControl: publishControl,
+    showToast: showToast,
+    initMQTT: initMQTT
+};
 
-// ==================== ADD TOAST STYLES ====================
-const style = document.createElement('style');
-style.textContent = `
-@keyframes slideIn {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-`;
-document.head.appendChild(style);
-
-// ==================== INITIAL RENDER ====================
-renderSensors();
-renderPhPanel();
-renderPumps();
-renderConnStatus();
-
-console.log('✅ Dashboard ready!');
-console.log('📡 Monitoring MQTT topics:', MQTT_CONFIG.topics);
-console.log('📡 Current Broker:', MQTT_CONFIG.brokerName);
+console.log('🔧 Debug: Type "debug" in console to see state');
+console.log('🔧 Debug: Type "debug.publishControl(topic, value)" to send MQTT');
