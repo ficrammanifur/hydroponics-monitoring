@@ -60,15 +60,15 @@
       <section class="conn-bar" aria-label="Informasi koneksi">
         <div class="conn-item">
           <span class="conn-k">Host</span>
-          <span class="conn-v mono" id="connHost">c68f1f76.ala.us-east-1.emqxsl.com</span>
+          <span class="conn-v mono" id="connHost">broker.hivemq.com</span>
         </div>
         <div class="conn-item">
           <span class="conn-k">Port</span>
-          <span class="conn-v mono">8883 · TLS</span>
+          <span class="conn-v mono">1883</span>
         </div>
         <div class="conn-item">
           <span class="conn-k">Client ID</span>
-          <span class="conn-v mono">rizky_esp32</span>
+          <span class="conn-v mono" id="clientId">-</span>
         </div>
         <div class="conn-item">
           <span class="conn-k">Uptime</span>
@@ -78,7 +78,7 @@
           <span class="conn-k">Paket Diterima</span>
           <span class="conn-v mono" id="pktCount">0</span>
         </div>
-        <button class="btn-reconnect" id="reconnectBtn" type="button">Putuskan Koneksi</button>
+        <button class="btn-reconnect" id="reconnectBtn" type="button">Sambungkan</button>
       </section>
 
       <!-- ========================= SENSOR ========================= -->
@@ -104,12 +104,14 @@
 
       <footer class="foot">
         <p>
-          Data disimulasikan untuk demo. Sambungkan ke broker EMQX via MQTT over WebSocket untuk data ESP32 real-time.
-          Lihat <span class="mono">README.md</span> untuk arsitektur, diagram, dan metode fuzzy.
+          Data real-time dari ESP32 via MQTT broker HiveMQ.
+          Gunakan dashboard ini untuk memonitor dan mengontrol sistem hidroponik NFT.
         </p>
       </footer>
     </main>
 
+    <!-- ========================= MQTT LIBRARY ========================= -->
+    <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
