@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2f7d4f" />
+    <title>Hydroponic NFT — Dashboard Monitoring</title>
+    <meta
+      name="description"
+      content="Monitoring & kontrol sistem hidroponik NFT: TDS, suhu, pH, dan pompa nutrisi dengan kendali pH fuzzy secara real-time."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ============================= HEADER ============================= -->
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+              <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+            </svg>
+          </div>
+          <div>
+            <h1>Hidroponik NFT</h1>
+            <p class="brand-sub">Dashboard Monitoring &amp; Kontrol</p>
+          </div>
+        </div>
+
+        <!-- Status koneksi broker & perangkat -->
+        <div class="status-cluster">
+          <div class="status-pill" id="brokerPill">
+            <span class="dot" id="brokerDot"></span>
+            <div class="status-text">
+              <span class="status-label">Broker MQTT</span>
+              <span class="status-value" id="brokerStatus">Menghubungkan…</span>
+            </div>
+          </div>
+          <div class="status-pill" id="espPill">
+            <span class="dot" id="espDot"></span>
+            <div class="status-text">
+              <span class="status-label">ESP32</span>
+              <span class="status-value" id="espStatus">Menunggu…</span>
+            </div>
+          </div>
+          <div class="clock" id="clock">--:--:--</div>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap main">
+      <!-- ======================= INFO KONEKSI ======================= -->
+      <section class="conn-bar" aria-label="Informasi koneksi">
+        <div class="conn-item">
+          <span class="conn-k">Host</span>
+          <span class="conn-v mono" id="connHost">c68f1f76.ala.us-east-1.emqxsl.com</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Port</span>
+          <span class="conn-v mono">8883 · TLS</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Client ID</span>
+          <span class="conn-v mono">rizky_esp32</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Uptime</span>
+          <span class="conn-v mono" id="uptime">00:00:00</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Paket Diterima</span>
+          <span class="conn-v mono" id="pktCount">0</span>
+        </div>
+        <button class="btn-reconnect" id="reconnectBtn" type="button">Putuskan Koneksi</button>
+      </section>
+
+      <!-- ========================= SENSOR ========================= -->
+      <section aria-label="Pembacaan sensor">
+        <h2 class="section-title">Pembacaan Sensor</h2>
+        <div class="sensor-grid" id="sensorGrid"></div>
+      </section>
+
+      <!-- ========================= KONTROL pH ========================= -->
+      <section aria-label="Kontrol pH" class="mt">
+        <h2 class="section-title">Kontrol pH Larutan Nutrisi (Fuzzy)</h2>
+        <div class="ph-panel" id="phPanel"></div>
+      </section>
+
+      <!-- ========================= POMPA ========================= -->
+      <section aria-label="Kontrol pompa" class="mt">
+        <div class="section-head">
+          <h2 class="section-title mb0">Kontrol Pompa</h2>
+          <span class="badge-count"><span id="activePumps">0</span> aktif</span>
+        </div>
+        <div class="pump-groups" id="pumpGroups"></div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          Data disimulasikan untuk demo. Sambungkan ke broker EMQX via MQTT over WebSocket untuk data ESP32 real-time.
+          Lihat <span class="mono">README.md</span> untuk arsitektur, diagram, dan metode fuzzy.
+        </p>
+      </footer>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
