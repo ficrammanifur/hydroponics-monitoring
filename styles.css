@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Hidroponik NFT Dashboard — tema hijau tumbuh, aksen amber
+   Hydroponic NFT Dashboard — Tema Hijau Tumbuh
    ========================================================================== */
 :root {
   --bg: #f2f6f0;
@@ -276,8 +276,8 @@ body {
   font-family: var(--font);
   font-size: 13px;
   font-weight: 600;
-  color: var(--danger);
-  background: var(--danger-soft);
+  color: var(--primary);
+  background: var(--primary-soft);
   border: 1px solid transparent;
   border-radius: 9px;
   padding: 9px 16px;
@@ -286,12 +286,12 @@ body {
 }
 
 .btn-reconnect:hover {
-  filter: brightness(0.97);
+  filter: brightness(0.95);
 }
 
 .btn-reconnect.reconnect {
-  color: var(--primary);
-  background: var(--primary-soft);
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 /* ========================= SENSOR CARDS ========================= */
@@ -562,7 +562,6 @@ body {
   line-height: 1.5;
 }
 
-/* dosing actuator cards */
 .dose-cards {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -781,7 +780,6 @@ body {
   font-family: var(--mono);
 }
 
-/* toggle switch */
 .switch {
   position: relative;
   width: 44px;
@@ -835,12 +833,51 @@ body {
   line-height: 1.6;
 }
 
-/* dim everything when offline */
-body.offline .sensor-grid,
-body.offline .ph-panel,
-body.offline .pump-groups {
-  opacity: 0.5;
-  filter: grayscale(0.4);
-  pointer-events: none;
-  transition: opacity 0.3s;
+/* ========================= RESPONSIVE ========================= */
+@media (max-width: 768px) {
+  .header-inner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .status-cluster {
+    justify-content: center;
+  }
+  
+  .conn-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .btn-reconnect {
+    margin-left: 0;
+  }
+  
+  .ph-panel {
+    grid-template-columns: 1fr;
+  }
+  
+  .dose-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .sensor-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .pump-groups {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========================= TOAST ========================= */
+#toastContainer {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
