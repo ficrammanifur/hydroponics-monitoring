@@ -1,14 +1,35 @@
 /* ==========================================================================
-   Hidroponik NFT Dashboard — MQTT Integration with HiveMQ
+   Hidroponik NFT Dashboard — MQTT Integration with Multiple Broker Fallback
    ========================================================================== */
 
 // ==================== MQTT CONFIGURATION ====================
+const MQTT_BROKERS = [
+    {
+        name: 'EMQX',
+        broker: 'wss://broker.emqx.io:8084/mqtt',
+        port: 8084
+    },
+    {
+        name: 'HiveMQ',
+        broker: 'wss://broker.hivemq.com:8084/mqtt',
+        port: 8084
+    },
+    {
+        name: 'Mosquitto',
+        broker: 'wss://test.mosquitto.org:8081/mqtt',
+        port: 8081
+    }
+];
+
+let CURRENT_BROKER_INDEX = 0;
+
 const MQTT_CONFIG = {
-    // HiveMQ Public Broker - WebSocket Secure (WSS)
-    // Port yang benar untuk WebSocket adalah 8084
-    broker: 'wss://broker.hivemq.com:8084/mqtt',
-    
-    // Topics
+    get broker() {
+        return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker;
+    },
+    get brokerName() {
+        return MQTT_BROKERS[CURRENT_BROKER_INDEX].name;
+    },
     topics: {
         ph: 'hydroponic/sensor/ph',
         tds: 'hydroponic/sensor/tds',
@@ -118,7 +139,8 @@ const state = {
   startTime: Date.now(),
   mqttConnected: false,
   clientId: '',
-  hasReceivedData: false
+  hasReceivedData: false,
+  currentBroker: 0
 };
 
 // seed flat history
@@ -130,12 +152,13 @@ SENSORS.forEach((s) => {
 let mqttClient = null;
 let reconnectTimer = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_RECONNECT_ATTEMPTS = 5;
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🌱 Hydroponic NFT Dashboard');
     console.log('📡 MQTT Broker:', MQTT_CONFIG.broker);
+    console.log('📡 Broker Name:', MQTT_CONFIG.brokerName);
     
     renderSensors();
     renderPhPanel();
@@ -161,13 +184,14 @@ function connectMQTT() {
     const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
     state.clientId = clientId;
     document.getElementById('clientId').textContent = clientId;
+    document.getElementById('connHost').textContent = MQTT_CONFIG.brokerName + ' (' + MQTT_CONFIG.broker + ')';
     
     const options = {
         clientId: clientId,
         clean: true,
-        reconnectPeriod: 5000,
+        reconnectPeriod: 3000,
         keepAlive: 60,
-        connectTimeout: 30000,
+        connectTimeout: 15000,
         will: {
             topic: MQTT_CONFIG.topics.statusDashboard,
             payload: 'offline',
@@ -178,19 +202,20 @@ function connectMQTT() {
     
     console.log('🔄 Connecting to MQTT...');
     console.log('📡 Broker:', MQTT_CONFIG.broker);
+    console.log('📡 Name:', MQTT_CONFIG.brokerName);
     
     try {
         mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
         
         mqttClient.on('connect', () => {
-            console.log('✅ MQTT Connected to HiveMQ');
+            console.log('✅ MQTT Connected to', MQTT_CONFIG.brokerName);
             state.broker = "online";
             state.mqttConnected = true;
             state.startTime = Date.now();
             reconnectAttempts = 0;
             renderConnStatus();
             
-            showToast('✅ MQTT Connected!', 'success');
+            showToast('✅ MQTT Connected to ' + MQTT_CONFIG.brokerName + '!', 'success');
             
             // Subscribe ke semua topik
             const topics = [
@@ -241,18 +266,10 @@ function connectMQTT() {
             state.broker = "offline";
             state.mqttConnected = false;
             renderConnStatus();
-            showToast('❌ MQTT Error: ' + err.message, 'error');
+            showToast('❌ MQTT Error with ' + MQTT_CONFIG.brokerName + ': ' + err.message, 'error');
             
-            // Retry dengan backoff
-            reconnectAttempts++;
-            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-                const delay = Math.min(30000, 5000 * reconnectAttempts);
-                setTimeout(() => {
-                    if (!state.mqttConnected) {
-                        connectMQTT();
-                    }
-                }, delay);
-            }
+            // Try next broker
+            switchToNextBroker();
         });
         
         mqttClient.on('offline', () => {
@@ -273,6 +290,13 @@ function connectMQTT() {
             state.broker = "offline";
             state.mqttConnected = false;
             renderConnStatus();
+            
+            // Try next broker after delay
+            setTimeout(() => {
+                if (!state.mqttConnected) {
+                    switchToNextBroker();
+                }
+            }, 5000);
         });
         
     } catch (e) {
@@ -281,13 +305,31 @@ function connectMQTT() {
         renderConnStatus();
         showToast('❌ MQTT Error: ' + e.message, 'error');
         
-        // Retry after 10 seconds
+        // Try next broker
         setTimeout(() => {
-            if (!state.mqttConnected) {
-                connectMQTT();
-            }
-        }, 10000);
+            switchToNextBroker();
+        }, 5000);
     }
+}
+
+// ==================== SWITCH TO NEXT BROKER ====================
+function switchToNextBroker() {
+    CURRENT_BROKER_INDEX = (CURRENT_BROKER_INDEX + 1) % MQTT_BROKERS.length;
+    console.log('🔄 Switching to broker:', MQTT_BROKERS[CURRENT_BROKER_INDEX].name);
+    showToast('🔄 Switching to ' + MQTT_BROKERS[CURRENT_BROKER_INDEX].name + '...', 'info');
+    
+    // Update config
+    Object.defineProperty(MQTT_CONFIG, 'broker', {
+        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker; }
+    });
+    Object.defineProperty(MQTT_CONFIG, 'brokerName', {
+        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].name; }
+    });
+    
+    document.getElementById('connHost').textContent = MQTT_CONFIG.brokerName + ' (' + MQTT_CONFIG.broker + ')';
+    
+    // Reconnect
+    connectMQTT();
 }
 
 // ==================== HANDLE MQTT MESSAGE ====================
@@ -460,7 +502,7 @@ function renderConnStatus() {
   const reBtn = document.getElementById("reconnectBtn");
 
   bDot.className = "dot " + (state.broker === "online" ? "online" : state.broker === "connecting" ? "connecting" : "offline");
-  bTxt.textContent = state.broker === "online" ? "Terhubung" : state.broker === "connecting" ? "Menghubungkan…" : "Terputus";
+  bTxt.textContent = state.broker === "online" ? "Terhubung (" + MQTT_CONFIG.brokerName + ")" : state.broker === "connecting" ? "Menghubungkan…" : "Terputus";
 
   const espOk = state.broker === "online" && state.esp === "active";
   eDot.className = "dot " + (espOk ? "online" : state.esp === "waiting" ? "connecting" : "offline");
@@ -797,8 +839,16 @@ document.getElementById("reconnectBtn").addEventListener("click", () => {
     renderConnStatus();
     showToast('🔌 Disconnected from MQTT', 'info');
   } else {
+    // Reset to first broker
+    CURRENT_BROKER_INDEX = 0;
+    Object.defineProperty(MQTT_CONFIG, 'broker', {
+        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].broker; }
+    });
+    Object.defineProperty(MQTT_CONFIG, 'brokerName', {
+        get: function() { return MQTT_BROKERS[CURRENT_BROKER_INDEX].name; }
+    });
     connectMQTT();
-    showToast('🔄 Connecting to MQTT...', 'info');
+    showToast('🔄 Connecting to ' + MQTT_CONFIG.brokerName + '...', 'info');
   }
 });
 
@@ -820,3 +870,4 @@ renderConnStatus();
 
 console.log('✅ Dashboard ready!');
 console.log('📡 Monitoring MQTT topics:', MQTT_CONFIG.topics);
+console.log('📡 Current Broker:', MQTT_CONFIG.brokerName);
