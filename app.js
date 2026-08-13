@@ -4,17 +4,17 @@
 
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
-    broker: 'wss://broker.hivemq.com:8000/mqtt',
-    // Untuk HiveMQ public, tidak perlu username/password
+    // HiveMQ Public Broker - WebSocket Secure (WSS)
+    // Port yang benar untuk WebSocket adalah 8084
+    broker: 'wss://broker.hivemq.com:8084/mqtt',
     
+    // Topics
     topics: {
-        // Sensor Topics (dari ESP32)
         ph: 'hydroponic/sensor/ph',
         tds: 'hydroponic/sensor/tds',
         temp: 'hydroponic/sensor/temp',
         all: 'hydroponic/sensor/all',
         
-        // Control Topics (ke ESP32)
         controlAerator: 'hydroponic/control/aerator',
         controlSirkulasi1: 'hydroponic/control/sirkulasi1',
         controlSirkulasi2: 'hydroponic/control/sirkulasi2',
@@ -23,7 +23,6 @@ const MQTT_CONFIG = {
         controlNutrisiA: 'hydroponic/control/nutrisia',
         controlNutrisiB: 'hydroponic/control/nutrisib',
         
-        // Status Topics (dari ESP32)
         statusAerator: 'hydroponic/status/aerator',
         statusSirkulasi1: 'hydroponic/status/sirkulasi1',
         statusSirkulasi2: 'hydroponic/status/sirkulasi2',
@@ -31,7 +30,8 @@ const MQTT_CONFIG = {
         statusPhDown: 'hydroponic/status/phdown',
         statusNutrisiA: 'hydroponic/status/nutrisia',
         statusNutrisiB: 'hydroponic/status/nutrisib',
-        statusDevice: 'hydroponic/status/device'
+        statusDevice: 'hydroponic/status/device',
+        statusDashboard: 'hydroponic/status/dashboard'
     }
 };
 
@@ -74,11 +74,11 @@ const SENSORS = [
 
 // ==================== KONFIGURASI POMPA ====================
 const PUMPS = [
-  { key: "aerator", name: "Aerator", pin: 12, group: "Aerasi", controlTopic: MQTT_CONFIG.topics.controlAerator, statusTopic: MQTT_CONFIG.topics.statusAerator },
-  { key: "sirkulasi1", name: "Sirkulasi 1", pin: 13, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi1, statusTopic: MQTT_CONFIG.topics.statusSirkulasi1 },
-  { key: "sirkulasi2", name: "Sirkulasi 2", pin: 11, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi2, statusTopic: MQTT_CONFIG.topics.statusSirkulasi2 },
-  { key: "nutrisiA", name: "Nutrisi A", pin: 14, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiA, statusTopic: MQTT_CONFIG.topics.statusNutrisiA },
-  { key: "nutrisiB", name: "Nutrisi B", pin: 17, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiB, statusTopic: MQTT_CONFIG.topics.statusNutrisiB },
+  { key: "aerator", name: "Aerator", pin: 12, group: "Aerasi", controlTopic: 'hydroponic/control/aerator', statusTopic: 'hydroponic/status/aerator' },
+  { key: "sirkulasi1", name: "Sirkulasi 1", pin: 13, group: "Sirkulasi", controlTopic: 'hydroponic/control/sirkulasi1', statusTopic: 'hydroponic/status/sirkulasi1' },
+  { key: "sirkulasi2", name: "Sirkulasi 2", pin: 11, group: "Sirkulasi", controlTopic: 'hydroponic/control/sirkulasi2', statusTopic: 'hydroponic/status/sirkulasi2' },
+  { key: "nutrisiA", name: "Nutrisi A", pin: 14, group: "Dosis Nutrisi", controlTopic: 'hydroponic/control/nutrisia', statusTopic: 'hydroponic/status/nutrisia' },
+  { key: "nutrisiB", name: "Nutrisi B", pin: 17, group: "Dosis Nutrisi", controlTopic: 'hydroponic/control/nutrisib', statusTopic: 'hydroponic/status/nutrisib' },
 ];
 const PUMP_GROUP_ORDER = ["Aerasi", "Sirkulasi", "Dosis Nutrisi"];
 
@@ -104,7 +104,7 @@ const PUMP_ICON = '<path d="M4 20V10a2 2 0 0 1 2-2h6l3-3v14"/><path d="M12 8V4h4
 // ==================== STATE ====================
 const HISTORY_LEN = 40;
 const state = {
-  values: { tds: 1000, temp: 24, ph: 6.0 },
+  values: { tds: 0, temp: 0, ph: 0 },
   history: { tds: [], temp: [], ph: [] },
   pumps: { aerator: false, sirkulasi1: false, sirkulasi2: false, nutrisiA: false, nutrisiB: false, phUp: false, phDown: false },
   phMode: "auto",
@@ -117,17 +117,20 @@ const state = {
   packets: 0,
   startTime: Date.now(),
   mqttConnected: false,
-  clientId: ''
+  clientId: '',
+  hasReceivedData: false
 };
 
 // seed flat history
 SENSORS.forEach((s) => {
-  state.history[s.key] = Array.from({ length: HISTORY_LEN }, () => state.values[s.key]);
+  state.history[s.key] = Array.from({ length: HISTORY_LEN }, () => 0);
 });
 
 // ==================== MQTT CLIENT ====================
 let mqttClient = null;
 let reconnectTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
@@ -148,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function connectMQTT() {
     if (mqttClient && mqttClient.connected) {
         mqttClient.end();
+        mqttClient = null;
     }
     
     state.broker = "connecting";
@@ -161,12 +165,19 @@ function connectMQTT() {
     const options = {
         clientId: clientId,
         clean: true,
-        reconnectPeriod: 3000,
+        reconnectPeriod: 5000,
         keepAlive: 60,
-        connectTimeout: 10000
+        connectTimeout: 30000,
+        will: {
+            topic: MQTT_CONFIG.topics.statusDashboard,
+            payload: 'offline',
+            qos: 1,
+            retain: false
+        }
     };
     
     console.log('🔄 Connecting to MQTT...');
+    console.log('📡 Broker:', MQTT_CONFIG.broker);
     
     try {
         mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
@@ -176,11 +187,12 @@ function connectMQTT() {
             state.broker = "online";
             state.mqttConnected = true;
             state.startTime = Date.now();
+            reconnectAttempts = 0;
             renderConnStatus();
             
             showToast('✅ MQTT Connected!', 'success');
             
-            // Subscribe ke semua topik yang diperlukan
+            // Subscribe ke semua topik
             const topics = [
                 MQTT_CONFIG.topics.ph,
                 MQTT_CONFIG.topics.tds,
@@ -206,10 +218,14 @@ function connectMQTT() {
                 });
             });
             
-            // Request status
+            // Publish status online
+            mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1, retain: false });
+            
+            // Request status dari ESP32
             setTimeout(() => {
                 if (mqttClient && mqttClient.connected) {
                     mqttClient.publish('hydroponic/status/request', 'STATUS');
+                    showToast('📡 Menunggu data dari ESP32...', 'info');
                 }
             }, 1000);
         });
@@ -226,6 +242,17 @@ function connectMQTT() {
             state.mqttConnected = false;
             renderConnStatus();
             showToast('❌ MQTT Error: ' + err.message, 'error');
+            
+            // Retry dengan backoff
+            reconnectAttempts++;
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                const delay = Math.min(30000, 5000 * reconnectAttempts);
+                setTimeout(() => {
+                    if (!state.mqttConnected) {
+                        connectMQTT();
+                    }
+                }, delay);
+            }
         });
         
         mqttClient.on('offline', () => {
@@ -241,48 +268,60 @@ function connectMQTT() {
             renderConnStatus();
         });
         
+        mqttClient.on('close', () => {
+            console.log('🔌 MQTT Connection Closed');
+            state.broker = "offline";
+            state.mqttConnected = false;
+            renderConnStatus();
+        });
+        
     } catch (e) {
         console.error('❌ MQTT Init error:', e);
         state.broker = "offline";
         renderConnStatus();
         showToast('❌ MQTT Error: ' + e.message, 'error');
+        
+        // Retry after 10 seconds
+        setTimeout(() => {
+            if (!state.mqttConnected) {
+                connectMQTT();
+            }
+        }, 10000);
     }
 }
 
 // ==================== HANDLE MQTT MESSAGE ====================
 function handleMQTTMessage(topic, payload) {
-    const topics = MQTT_CONFIG.topics;
     state.lastPacket = Date.now();
     state.packets++;
-    state.esp = "active";
+    state.hasReceivedData = true;
     
     // Update status ESP
-    if (topic === topics.statusDevice) {
+    if (topic === MQTT_CONFIG.topics.statusDevice) {
         state.esp = payload === 'online' ? 'active' : 'inactive';
         renderConnStatus();
         return;
     }
     
     // Parse sensor data
-    if (topic === topics.all) {
+    if (topic === MQTT_CONFIG.topics.all) {
         try {
             const data = JSON.parse(payload);
-            if (data.ph !== undefined) state.values.ph = data.ph;
-            if (data.tds !== undefined) state.values.tds = data.tds;
-            if (data.temperature !== undefined) state.values.temp = data.temperature;
-            
-            // Update history
-            SENSORS.forEach(s => {
-                if (data[s.key] !== undefined || data[s.key === 'temp' ? 'temperature' : s.key] !== undefined) {
-                    const val = data[s.key] || data[s.key === 'temp' ? 'temperature' : s.key];
-                    state.history[s.key] = state.history[s.key].slice(1).concat(val);
-                }
-            });
+            if (data.ph !== undefined) {
+                state.values.ph = parseFloat(data.ph);
+                state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
+            }
+            if (data.tds !== undefined) {
+                state.values.tds = parseFloat(data.tds);
+                state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
+            }
+            if (data.temperature !== undefined) {
+                state.values.temp = parseFloat(data.temperature);
+                state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
+            }
             
             renderSensors();
             renderPhPanel();
-            
-            // Update fuzzy
             updateFuzzyLogic();
             
         } catch (e) {
@@ -292,7 +331,7 @@ function handleMQTTMessage(topic, payload) {
     }
     
     // Individual sensor topics
-    if (topic === topics.ph) {
+    if (topic === MQTT_CONFIG.topics.ph) {
         state.values.ph = parseFloat(payload);
         state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
         renderSensors();
@@ -301,14 +340,14 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    if (topic === topics.tds) {
+    if (topic === MQTT_CONFIG.topics.tds) {
         state.values.tds = parseFloat(payload);
         state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
         renderSensors();
         return;
     }
     
-    if (topic === topics.temp) {
+    if (topic === MQTT_CONFIG.topics.temp) {
         state.values.temp = parseFloat(payload);
         state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
         renderSensors();
@@ -317,13 +356,13 @@ function handleMQTTMessage(topic, payload) {
     
     // Pump status
     const pumpMap = {
-        [topics.statusAerator]: 'aerator',
-        [topics.statusSirkulasi1]: 'sirkulasi1',
-        [topics.statusSirkulasi2]: 'sirkulasi2',
-        [topics.statusPhUp]: 'phUp',
-        [topics.statusPhDown]: 'phDown',
-        [topics.statusNutrisiA]: 'nutrisiA',
-        [topics.statusNutrisiB]: 'nutrisiB'
+        'hydroponic/status/aerator': 'aerator',
+        'hydroponic/status/sirkulasi1': 'sirkulasi1',
+        'hydroponic/status/sirkulasi2': 'sirkulasi2',
+        'hydroponic/status/phup': 'phUp',
+        'hydroponic/status/phdown': 'phDown',
+        'hydroponic/status/nutrisia': 'nutrisiA',
+        'hydroponic/status/nutrisib': 'nutrisiB'
     };
     
     if (pumpMap[topic]) {
@@ -387,25 +426,10 @@ function fuzzyPhController(ph, targetMin, targetMax) {
 }
 
 function updateFuzzyLogic() {
-    const ph = state.values.ph;
+    const ph = state.values.ph || 0;
     const { min, max } = state.phTarget;
     const fuzzy = fuzzyPhController(ph, min, max);
     state.fuzzy = fuzzy;
-    
-    // Auto dosing
-    if (state.phMode === "auto") {
-        if (fuzzy.action === "dosing-up") {
-            publishControl(MQTT_CONFIG.topics.controlPhUp, "ON");
-            setTimeout(() => {
-                publishControl(MQTT_CONFIG.topics.controlPhUp, "OFF");
-            }, 2000);
-        } else if (fuzzy.action === "dosing-down") {
-            publishControl(MQTT_CONFIG.topics.controlPhDown, "ON");
-            setTimeout(() => {
-                publishControl(MQTT_CONFIG.topics.controlPhDown, "OFF");
-            }, 2000);
-        }
-    }
 }
 
 // ==================== PUBLISH CONTROL ====================
@@ -511,7 +535,7 @@ function renderSensors() {
 
 function renderPhPanel() {
   const panel = document.getElementById("phPanel");
-  const ph = state.values.ph || 6.0;
+  const ph = state.values.ph || 0;
   const { min, max } = state.phTarget;
   const inRange = ph >= min && max >= ph;
   const stateColor = inRange
@@ -680,8 +704,8 @@ function setPhMode(mode) {
   if (mode === "manual") {
     state.pumps.phUp = false;
     state.pumps.phDown = false;
-    publishControl(MQTT_CONFIG.topics.controlPhUp, "OFF");
-    publishControl(MQTT_CONFIG.topics.controlPhDown, "OFF");
+    publishControl('hydroponic/control/phup', "OFF");
+    publishControl('hydroponic/control/phdown', "OFF");
   }
   renderPhPanel();
 }
@@ -692,9 +716,9 @@ function togglePhManual(pump) {
   state.pumps.phDown = pump === "phDown" ? next : false;
   
   if (pump === "phUp") {
-    publishControl(MQTT_CONFIG.topics.controlPhUp, next ? "ON" : "OFF");
+    publishControl('hydroponic/control/phup', next ? "ON" : "OFF");
   } else if (pump === "phDown") {
-    publishControl(MQTT_CONFIG.topics.controlPhDown, next ? "ON" : "OFF");
+    publishControl('hydroponic/control/phdown', next ? "ON" : "OFF");
   }
   renderPhPanel();
 }
@@ -727,7 +751,6 @@ function tickClock() {
 function showToast(message, type = 'info') {
     const container = document.getElementById('toastContainer');
     if (!container) {
-        // Create toast container if not exists
         const div = document.createElement('div');
         div.id = 'toastContainer';
         div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
