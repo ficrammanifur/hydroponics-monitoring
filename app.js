@@ -6,9 +6,13 @@
 
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
-    // Gunakan broker alternatif atau HTTP
-    broker: 'ws://broker.hivemq.com:8000/mqtt',  // Port 8000 untuk WebSocket non-SSL
-    // broker: 'wss://broker.hivemq.com:8084/mqtt', // SSL (mungkin terblokir)
+    // HiveMQ Public Broker - WebSocket Secure (WSS)
+    // Port 8084 untuk WSS (SSL)
+    broker: 'wss://broker.hivemq.com:8084/mqtt',
+    
+    // Alternatif: Gunakan broker lain yang support WSS
+    // broker: 'wss://test.mosquitto.org:8081/mqtt',
+    // broker: 'wss://broker.emqx.io:8084/mqtt',
     
     topics: {
         // Sensor Topics (dari ESP32)
@@ -128,7 +132,8 @@ const state = {
   lastSensorUpdate: 0,
   isConnecting: false,
   reconnectAttempts: 0,
-  maxReconnectAttempts: 10
+  maxReconnectAttempts: 10,
+  usingFallback: false
 };
 
 // seed flat history
@@ -212,6 +217,17 @@ function connectMQTT() {
     const clientIdEl = document.getElementById('clientId');
     if (clientIdEl) clientIdEl.textContent = clientId;
     
+    // Gunakan WSS (WebSocket Secure)
+    let brokerUrl = MQTT_CONFIG.broker;
+    
+    // Fallback ke broker lain jika perlu
+    if (state.reconnectAttempts > 3 && !state.usingFallback) {
+        state.usingFallback = true;
+        brokerUrl = 'wss://test.mosquitto.org:8081/mqtt';
+        console.log('🔄 Switching to fallback broker:', brokerUrl);
+        showToast('🔄 Mencoba broker alternatif...', 'info');
+    }
+    
     const options = {
         clientId: clientId,
         clean: true,
@@ -227,14 +243,14 @@ function connectMQTT() {
     };
     
     console.log('🔄 Connecting to MQTT... (attempt ' + state.reconnectAttempts + ')');
-    console.log('📡 Broker:', MQTT_CONFIG.broker);
+    console.log('📡 Broker:', brokerUrl);
     showToast('🔄 Menghubungkan ke MQTT...', 'info');
     
     try {
-        mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
+        mqttClient = mqtt.connect(brokerUrl, options);
         
         mqttClient.on('connect', () => {
-            console.log('✅ MQTT Connected to HiveMQ');
+            console.log('✅ MQTT Connected to', brokerUrl);
             state.broker = "online";
             state.mqttConnected = true;
             state.isConnecting = false;
@@ -270,7 +286,7 @@ function connectMQTT() {
                 });
             });
             
-            // Subscribe ke wildcard untuk semua topik hydroponic/riski/
+            // Subscribe ke wildcard
             mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
             
             // Publish status online
@@ -296,7 +312,6 @@ function connectMQTT() {
             renderConnStatus();
             showToast('❌ MQTT Error: ' + err.message, 'error');
             
-            // Coba reconnect setelah 5 detik
             setTimeout(() => {
                 if (!state.mqttConnected) {
                     connectMQTT();
@@ -325,7 +340,6 @@ function connectMQTT() {
             state.isConnecting = false;
             renderConnStatus();
             
-            // Coba reconnect setelah 3 detik
             setTimeout(() => {
                 if (!state.mqttConnected) {
                     connectMQTT();
@@ -922,6 +936,7 @@ if (reconnectBtn) {
       showToast('🔌 Terputus dari MQTT', 'info');
     } else {
       state.reconnectAttempts = 0;
+      state.usingFallback = false;
       connectMQTT();
       showToast('🔄 Menghubungkan ke MQTT...', 'info');
     }
