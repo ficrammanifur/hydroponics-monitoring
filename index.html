@@ -6,20 +6,13 @@
     <meta name="theme-color" content="#2f7d4f" />
     <title>Hydroponic NFT — Dashboard Monitoring</title>
     
-    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    
-    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     
     <style>
-        /* ============================================================
-           RESET & VARIABLES
-           ============================================================ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-
         :root {
             --bg-main: #0a0f1a;
             --bg-card: #111827;
@@ -37,20 +30,9 @@
             --radius: 12px;
             --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
         }
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            background: var(--bg-main);
-            color: var(--text);
-            min-height: 100vh;
-            padding: 1rem;
-        }
-
+        body { font-family: 'Outfit', sans-serif; background: var(--bg-main); color: var(--text); min-height: 100vh; padding: 1rem; }
         .container { max-width: 1400px; margin: 0 auto; }
-
-        /* ============================================================
-           HEADER
-           ============================================================ */
+        
         .header {
             display: flex;
             justify-content: space-between;
@@ -63,655 +45,140 @@
             flex-wrap: wrap;
             gap: 0.75rem;
         }
-
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .header-icon {
-            width: 40px;
-            height: 40px;
-            background: var(--primary-bg);
-            color: var(--primary);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.2rem;
-        }
-
-        .header-left h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--primary), #34d399);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
+        .header-left { display: flex; align-items: center; gap: 0.75rem; }
+        .header-icon { width: 40px; height: 40px; background: var(--primary-bg); color: var(--primary); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
+        .header-left h1 { font-size: 1.25rem; font-weight: 700; background: linear-gradient(135deg, var(--primary), #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .header-left p { font-size: 0.7rem; color: var(--text-muted); }
-
-        .header-right {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-        }
-
-        .status-pill {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-            padding: 0.3rem 0.8rem;
-            background: var(--bg-main);
-            border-radius: 99px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
+        .header-right { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+        .status-pill { display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.8rem; background: var(--bg-main); border-radius: 99px; font-size: 0.75rem; font-weight: 500; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
         .dot.online { background: var(--success); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
         .dot.offline { background: var(--danger); }
         .dot.connecting { background: var(--warning); animation: pulse 1s infinite; }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.3; }
-        }
-
-        .badge-sm {
-            padding: 0.15rem 0.5rem;
-            border-radius: 99px;
-            font-size: 0.55rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .badge-sm { padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.55rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
         .badge-sm.active { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
         .badge-sm.inactive { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
         .badge-sm.neutral { background: var(--bg-main); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.2); }
-
-        .clock {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            padding: 0.3rem 0.8rem;
-            background: var(--bg-main);
-            border-radius: 99px;
-            border: 1px solid var(--border);
-        }
-
-        /* ============================================================
-           CONN BAR
-           ============================================================ */
-        .conn-bar {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 0.6rem 1.25rem;
-            margin-bottom: 1.25rem;
-            flex-wrap: wrap;
-        }
-
+        .clock { font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; font-weight: 600; color: var(--text-muted); padding: 0.3rem 0.8rem; background: var(--bg-main); border-radius: 99px; border: 1px solid var(--border); }
+        
+        .conn-bar { display: flex; align-items: center; gap: 1.5rem; background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.6rem 1.25rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
         .conn-item { display: flex; flex-direction: column; }
-        .conn-item .label {
-            font-size: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 600;
-        }
-        .conn-item .value {
-            font-size: 0.75rem;
-            font-weight: 600;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .btn-reconnect {
-            margin-left: auto;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.4rem 1rem;
-            border-radius: 8px;
-            border: 1px solid rgba(16,185,129,0.3);
-            background: var(--primary-bg);
-            color: var(--primary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+        .conn-item .label { font-size: 0.5rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; }
+        .conn-item .value { font-size: 0.75rem; font-weight: 600; font-family: 'JetBrains Mono', monospace; }
+        .btn-reconnect { margin-left: auto; font-family: 'Outfit', sans-serif; font-size: 0.75rem; font-weight: 600; padding: 0.4rem 1rem; border-radius: 8px; border: 1px solid rgba(16,185,129,0.3); background: var(--primary-bg); color: var(--primary); cursor: pointer; transition: all 0.2s; }
         .btn-reconnect:hover { background: rgba(16,185,129,0.25); }
         .btn-reconnect.danger { color: var(--danger); border-color: rgba(239,68,68,0.3); background: var(--danger-bg); }
-
-        /* ============================================================
-           GRID
-           ============================================================ */
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-            gap: 1rem;
-        }
-
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1.25rem;
-            box-shadow: var(--shadow);
-        }
-
-        .card-title {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-        }
+        
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; box-shadow: var(--shadow); }
+        .card-title { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); font-weight: 700; display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
         .card-title i { color: var(--primary); }
-
         .full-width { grid-column: 1 / -1; }
-
-        /* ============================================================
-           STATUS CARD
-           ============================================================ */
-        .status-display {
-            display: flex;
-            align-items: center;
-            gap: 1.25rem;
-        }
-
-        .status-icon {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.5rem;
-            flex-shrink: 0;
-        }
+        
+        .status-display { display: flex; align-items: center; gap: 1.25rem; }
+        .status-icon { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0; }
         .status-icon.good { background: var(--success-bg); color: var(--success); }
         .status-icon.warning { background: var(--warning-bg); color: var(--warning); }
         .status-icon.danger { background: var(--danger-bg); color: var(--danger); }
         .status-icon.neutral { background: var(--bg-main); color: var(--text-muted); }
-
         .status-text h2 { font-size: 1.5rem; font-weight: 800; }
         .status-text h2.good { color: var(--success); }
         .status-text h2.warning { color: var(--warning); }
         .status-text h2.danger { color: var(--danger); }
         .status-text h2.neutral { color: var(--text-muted); }
         .status-text p { color: var(--text-muted); font-size: 0.85rem; }
-
-        /* ============================================================
-           SENSOR PARAMS
-           ============================================================ */
-        .sensor-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 0.75rem;
-        }
-
-        .sensor-item {
-            background: var(--bg-main);
-            padding: 0.75rem;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-        }
-        .sensor-item .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 0.2rem;
-        }
+        
+        .sensor-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; }
+        .sensor-item { background: var(--bg-main); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--border); }
+        .sensor-item .header { display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.2rem; }
         .sensor-item .header i { color: var(--primary); margin-right: 0.25rem; }
-
-        .sensor-item .value {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.3rem;
-            font-weight: 700;
-        }
-        .sensor-item .unit {
-            font-size: 0.7rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            font-family: 'Outfit', sans-serif;
-        }
-
-        .badge-param {
-            font-size: 0.5rem;
-            padding: 0.1rem 0.4rem;
-            border-radius: 99px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
+        .sensor-item .value { font-family: 'JetBrains Mono', monospace; font-size: 1.3rem; font-weight: 700; }
+        .sensor-item .unit { font-size: 0.7rem; font-weight: 500; color: var(--text-muted); font-family: 'Outfit', sans-serif; }
+        .badge-param { font-size: 0.5rem; padding: 0.1rem 0.4rem; border-radius: 99px; font-weight: 700; text-transform: uppercase; }
         .badge-param.safe { background: var(--success-bg); color: var(--success); }
         .badge-param.warn { background: var(--warning-bg); color: var(--warning); }
         .badge-param.danger { background: var(--danger-bg); color: var(--danger); }
         .badge-param.neutral { background: var(--bg-main); color: var(--text-muted); }
-
-        /* ============================================================
-           PUMPS (6 Relay)
-           ============================================================ */
-        .pump-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-        }
-
-        .pump-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.5rem 0.75rem;
-            background: var(--bg-main);
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
-        .pump-item .info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .pump-item .icon {
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-main);
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            transition: all 0.3s;
-        }
-        .pump-item .icon.on {
-            background: var(--success-bg);
-            color: var(--success);
-            animation: spin 2s linear infinite;
-        }
+        
+        .pump-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+        .pump-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: var(--bg-main); border-radius: 8px; border: 1px solid var(--border); }
+        .pump-item .info { display: flex; align-items: center; gap: 0.5rem; }
+        .pump-item .icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; background: var(--bg-main); color: var(--text-muted); font-size: 0.75rem; transition: all 0.3s; }
+        .pump-item .icon.on { background: var(--success-bg); color: var(--success); animation: spin 2s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
-
         .pump-item .name { font-size: 0.75rem; font-weight: 600; }
         .pump-item .pin { font-size: 0.55rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-
-        /* Toggle Switch */
-        .toggle {
-            position: relative;
-            width: 34px;
-            height: 20px;
-            flex-shrink: 0;
-        }
+        .toggle { position: relative; width: 34px; height: 20px; flex-shrink: 0; }
         .toggle input { opacity: 0; width: 0; height: 0; }
-        .toggle .slider {
-            position: absolute;
-            cursor: pointer;
-            inset: 0;
-            background: var(--text-muted);
-            border-radius: 99px;
-            transition: 0.2s;
-        }
-        .toggle .slider::before {
-            content: "";
-            position: absolute;
-            height: 14px;
-            width: 14px;
-            left: 3px;
-            top: 3px;
-            background: #fff;
-            border-radius: 50%;
-            transition: 0.2s;
-        }
+        .toggle .slider { position: absolute; cursor: pointer; inset: 0; background: var(--text-muted); border-radius: 99px; transition: 0.2s; }
+        .toggle .slider::before { content: ""; position: absolute; height: 14px; width: 14px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
         .toggle input:checked + .slider { background: var(--primary); }
         .toggle input:checked + .slider::before { transform: translateX(14px); }
-
-        /* ============================================================
-           PH PANEL with PRESET
-           ============================================================ */
-        .ph-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .ph-grid .left,
-        .ph-grid .right {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-
-        /* Preset Select */
-        .preset-box {
-            background: var(--bg-main);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.75rem;
-        }
-        .preset-box label {
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 600;
-            display: block;
-            margin-bottom: 0.3rem;
-        }
+        
+        .ph-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .ph-grid .left, .ph-grid .right { display: flex; flex-direction: column; gap: 0.75rem; }
+        .preset-box { background: var(--bg-main); border: 1px solid var(--border); border-radius: 10px; padding: 0.75rem; }
+        .preset-box label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem; }
         .preset-box label i { color: var(--primary); margin-right: 0.25rem; }
-
-        .preset-select {
-            width: 100%;
-            padding: 0.4rem 0.7rem;
-            background: var(--bg-card);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 500;
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L1 3h8z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.7rem center;
-            padding-right: 2rem;
-        }
+        .preset-select { width: 100%; padding: 0.4rem 0.7rem; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-family: 'Outfit', sans-serif; font-size: 0.8rem; font-weight: 500; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L1 3h8z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 0.7rem center; padding-right: 2rem; }
         .preset-select:focus { outline: none; border-color: var(--primary); }
-
-        .preset-info {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            padding: 0.4rem 0.6rem;
-            background: var(--bg-card);
-            border-radius: 8px;
-            border: 1px solid var(--border);
-        }
+        .preset-info { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; padding: 0.4rem 0.6rem; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border); }
         .preset-info .emoji { font-size: 1rem; }
         .preset-info .name { font-size: 0.8rem; font-weight: 600; }
         .preset-info .range { font-size: 0.65rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-        .preset-info .status-badge {
-            margin-left: auto;
-            font-size: 0.55rem;
-            padding: 0.1rem 0.4rem;
-            border-radius: 99px;
-            font-weight: 700;
-        }
+        .preset-info .status-badge { margin-left: auto; font-size: 0.55rem; padding: 0.1rem 0.4rem; border-radius: 99px; font-weight: 700; }
         .preset-info .status-badge.ok { background: var(--success-bg); color: var(--success); }
         .preset-info .status-badge.adjust { background: var(--warning-bg); color: var(--warning); }
-
-        /* PH Readout */
-        .ph-readout {
-            display: flex;
-            align-items: baseline;
-            gap: 0.75rem;
-        }
-        .ph-readout .val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.2rem;
-            font-weight: 700;
-        }
-        .ph-readout .state {
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.15rem 0.6rem;
-            border-radius: 99px;
-        }
+        .ph-readout { display: flex; align-items: baseline; gap: 0.75rem; }
+        .ph-readout .val { font-family: 'JetBrains Mono', monospace; font-size: 2.2rem; font-weight: 700; }
+        .ph-readout .state { font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.6rem; border-radius: 99px; }
         .ph-readout .state.in-range { background: var(--success-bg); color: var(--success); }
         .ph-readout .state.low { background: var(--warning-bg); color: var(--warning); }
         .ph-readout .state.high { background: var(--danger-bg); color: var(--danger); }
-
-        /* PH Range Visual */
-        .ph-range {
-            position: relative;
-            height: 6px;
-            background: var(--border);
-            border-radius: 99px;
-            margin: 0.25rem 0;
-        }
-        .ph-range .bar {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            border-radius: 99px;
-            background: var(--primary);
-            opacity: 0.3;
-        }
-        .ph-range .marker {
-            position: absolute;
-            top: -3px;
-            width: 3px;
-            height: 12px;
-            border-radius: 2px;
-            background: var(--primary);
-            transform: translateX(-50%);
-            transition: left 0.5s ease;
-            box-shadow: 0 0 10px rgba(16,185,129,0.4);
-        }
-        .ph-range-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.55rem;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        /* Target Manual */
-        .target-box {
-            background: var(--bg-main);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.6rem 0.75rem;
-        }
-        .target-box label {
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-muted);
-            font-weight: 600;
-            display: block;
-            margin-bottom: 0.3rem;
-        }
-        .target-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .target-row input {
-            width: 60px;
-            padding: 0.3rem 0.4rem;
-            background: var(--bg-card);
-            color: var(--text);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
+        .ph-range { position: relative; height: 6px; background: var(--border); border-radius: 99px; margin: 0.25rem 0; }
+        .ph-range .bar { position: absolute; top: 0; height: 100%; border-radius: 99px; background: var(--primary); opacity: 0.3; }
+        .ph-range .marker { position: absolute; top: -3px; width: 3px; height: 12px; border-radius: 2px; background: var(--primary); transform: translateX(-50%); transition: left 0.5s ease; box-shadow: 0 0 10px rgba(16,185,129,0.4); }
+        .ph-range-labels { display: flex; justify-content: space-between; font-size: 0.55rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .target-box { background: var(--bg-main); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; }
+        .target-box label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; display: block; margin-bottom: 0.3rem; }
+        .target-row { display: flex; align-items: center; gap: 0.5rem; }
+        .target-row input { width: 60px; padding: 0.3rem 0.4rem; background: var(--bg-card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: 600; }
         .target-row input:focus { outline: none; border-color: var(--primary); }
         .target-row span { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
-
-        /* Mode Buttons - FIX: Lebih jelas */
-        .mode-group {
-            display: inline-flex;
-            background: var(--bg-main);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 3px;
-            gap: 3px;
-        }
-        .mode-group button {
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            padding: 0.3rem 0.8rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-        .mode-group button.active {
-            background: var(--bg-card);
-            color: var(--primary);
-            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        }
-        .mode-group button .mode-indicator {
-            display: inline-block;
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            margin-right: 4px;
-        }
-        .mode-group button.active .mode-indicator {
-            background: var(--success);
-            box-shadow: 0 0 8px rgba(16,185,129,0.5);
-        }
-        .mode-group button:not(.active) .mode-indicator {
-            background: var(--text-muted);
-        }
-
-        /* Fuzzy */
-        .fuzzy-box {
-            background: var(--bg-main);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.6rem 0.75rem;
-        }
-        .fuzzy-box .title {
-            font-size: 0.6rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-muted);
-            margin-bottom: 0.3rem;
-        }
-        .fuzzy-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+        
+        .mode-group { display: inline-flex; background: var(--bg-main); border: 1px solid var(--border); border-radius: 8px; padding: 3px; gap: 3px; }
+        .mode-group button { font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; color: var(--text-muted); background: transparent; border: none; padding: 0.3rem 0.8rem; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .mode-group button.active { background: var(--bg-card); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
+        .mode-group button .mode-indicator { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; }
+        .mode-group button.active .mode-indicator { background: var(--success); box-shadow: 0 0 8px rgba(16,185,129,0.5); }
+        .mode-group button:not(.active) .mode-indicator { background: var(--text-muted); }
+        
+        .fuzzy-box { background: var(--bg-main); border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; }
+        .fuzzy-box .title { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 0.3rem; }
+        .fuzzy-row { display: flex; align-items: center; gap: 0.5rem; }
         .fuzzy-row .label { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); width: 60px; }
-        .fuzzy-row .bar {
-            flex: 1;
-            height: 5px;
-            background: var(--border);
-            border-radius: 99px;
-            overflow: hidden;
-        }
-        .fuzzy-row .bar .fill {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 99px;
-            transition: width 0.4s;
-        }
-        .fuzzy-row .pct {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.6rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            width: 32px;
-            text-align: right;
-        }
-
-        /* Dose Buttons */
-        .dose-group {
-            display: flex;
-            gap: 0.5rem;
-        }
-        .dose-btn {
-            flex: 1;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.7rem;
-            font-weight: 600;
-            padding: 0.4rem;
-            border-radius: 8px;
-            border: 1px solid var(--border);
-            background: var(--bg-card);
-            color: var(--text);
-            cursor: pointer;
-            transition: all 0.15s;
-        }
+        .fuzzy-row .bar { flex: 1; height: 5px; background: var(--border); border-radius: 99px; overflow: hidden; }
+        .fuzzy-row .bar .fill { height: 100%; background: var(--primary); border-radius: 99px; transition: width 0.4s; }
+        .fuzzy-row .pct { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; font-weight: 600; color: var(--text-muted); width: 32px; text-align: right; }
+        
+        .dose-group { display: flex; gap: 0.5rem; }
+        .dose-btn { flex: 1; font-family: 'Outfit', sans-serif; font-size: 0.7rem; font-weight: 600; padding: 0.4rem; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text); cursor: pointer; transition: all 0.15s; }
         .dose-btn:hover:not(:disabled) { border-color: var(--primary); }
         .dose-btn.on { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
         .dose-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .hint {
-            font-size: 0.65rem;
-            color: var(--text-muted);
-            line-height: 1.4;
-        }
-
-        /* ============================================================
-           RAW DATA
-           ============================================================ */
-        .code-block {
-            background: #0a0f1a;
-            color: #e2e8f0;
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.6rem;
-            overflow-x: auto;
-            max-height: 150px;
-            overflow-y: auto;
-            line-height: 1.5;
-            border: 1px solid var(--border);
-            white-space: pre-wrap;
-        }
-
-        /* ============================================================
-           TOAST
-           ============================================================ */
-        #toastContainer {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-        .toast {
-            padding: 0.6rem 1rem;
-            border-radius: 8px;
-            color: #fff;
-            font-size: 0.8rem;
-            font-weight: 500;
-            animation: slideIn 0.3s ease;
-            max-width: 380px;
-            font-family: 'Outfit', sans-serif;
-        }
+        .hint { font-size: 0.65rem; color: var(--text-muted); line-height: 1.4; }
+        
+        .code-block { background: #0a0f1a; color: #e2e8f0; padding: 0.75rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; overflow-x: auto; max-height: 150px; overflow-y: auto; line-height: 1.5; border: 1px solid var(--border); white-space: pre-wrap; }
+        
+        #toastContainer { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 6px; }
+        .toast { padding: 0.6rem 1rem; border-radius: 8px; color: #fff; font-size: 0.8rem; font-weight: 500; animation: slideIn 0.3s ease; max-width: 380px; font-family: 'Outfit', sans-serif; }
         .toast.success { background: var(--success); }
         .toast.error { background: var(--danger); }
         .toast.warning { background: var(--warning); }
         .toast.info { background: #3b82f6; }
-
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-
-        /* ============================================================
-           RESPONSIVE
-           ============================================================ */
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        
         @media (max-width: 768px) {
             body { padding: 0.5rem; }
             .header { flex-direction: column; align-items: stretch; }
@@ -725,15 +192,11 @@
             .full-width { grid-column: 1; }
             .status-display { flex-direction: column; text-align: center; }
         }
-
-        @media (max-width: 480px) {
-            .sensor-grid { grid-template-columns: 1fr; }
-        }
+        @media (max-width: 480px) { .sensor-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- ========== HEADER ========== -->
         <header class="header">
             <div class="header-left">
                 <div class="header-icon"><i class="fa-solid fa-leaf"></i></div>
@@ -753,7 +216,6 @@
             </div>
         </header>
 
-        <!-- ========== CONN BAR ========== -->
         <div class="conn-bar">
             <div class="conn-item">
                 <span class="label">Host</span>
@@ -778,9 +240,7 @@
             <button class="btn-reconnect" id="reconnectBtn">Sambungkan</button>
         </div>
 
-        <!-- ========== GRID ========== -->
         <div class="grid">
-            <!-- STATUS CARD -->
             <div class="card">
                 <div class="card-title"><i class="fa-solid fa-water"></i> Status Air</div>
                 <div class="status-display">
@@ -794,25 +254,21 @@
                 </div>
             </div>
 
-            <!-- SENSOR PARAMS -->
             <div class="card">
                 <div class="card-title"><i class="fa-solid fa-microchip"></i> Parameter Sensor</div>
                 <div class="sensor-grid" id="sensorGrid"></div>
             </div>
 
-            <!-- PUMPS (6 Relay) -->
             <div class="card">
                 <div class="card-title"><i class="fa-solid fa-plug"></i> Kontrol Pompa <span style="margin-left:auto;font-size:0.6rem;font-weight:400;color:var(--text-muted);">(<span id="activePumps">0</span> aktif)</span></div>
                 <div class="pump-grid" id="pumpGrid"></div>
             </div>
 
-            <!-- PH + PRESET -->
             <div class="card">
-                <div class="card-title"><i class="fa-solid fa-flask"></i> Kontrol pH &amp; Preset Tanaman <span style="margin-left:auto;font-size:0.6rem;font-weight:400;color:var(--text-muted);" id="presetBadge">Manual</span></div>
+                <div class="card-title"><i class="fa-solid fa-flask"></i> Kontrol pH &amp; Preset Tanaman</div>
                 <div class="ph-grid" id="phPanel"></div>
             </div>
 
-            <!-- RAW DATA -->
             <div class="card full-width">
                 <div class="card-title"><i class="fa-solid fa-code"></i> Data Telemetry</div>
                 <pre class="code-block" id="lastMessage">Menunggu data dari ESP32...</pre>
@@ -820,10 +276,8 @@
         </div>
     </div>
 
-    <!-- ========== TOAST ========== -->
     <div id="toastContainer"></div>
 
-    <!-- ========== MQTT ========== -->
     <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
     <script>
         // ============================================================
@@ -880,7 +334,7 @@
         ];
 
         // ============================================================
-        // SENSORS & PUMPS (6 Relay)
+        // SENSORS & PUMPS
         // ============================================================
         const SENSORS = [
             { key: 'ph', label: 'pH', unit: 'pH', dec: 2, icon: 'fa-vial', idealMin: 5.5, idealMax: 7.0 },
@@ -903,7 +357,7 @@
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
             pumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
-            phMode: 'auto',  // Default auto
+            phMode: 'auto',
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
             broker: 'offline',
@@ -915,11 +369,10 @@
             connecting: false,
             attempts: 0,
             currentPreset: 'custom',
-            // FIX: Track mode dari ESP32 untuk sync
-            espMode: 'auto',
-            // FIX: Cegah spam publish
             lastModeSent: '',
-            modeSendTime: 0
+            modeSendTime: 0,
+            // ★★★ FIX: Force update flag ★★★
+            forceUpdate: false
         };
 
         let client = null;
@@ -947,8 +400,7 @@
             statusIcon: $('statusIcon'),
             waterStatus: $('waterStatus'),
             statusDetail: $('statusDetail'),
-            lastMessage: $('lastMessage'),
-            presetBadge: $('presetBadge')
+            lastMessage: $('lastMessage')
         };
 
         // ============================================================
@@ -1075,7 +527,7 @@
         }
 
         // ============================================================
-        // HANDLE MESSAGE - FIX: Update UI dari ESP32
+        // ★★★ HANDLE MESSAGE - FIX: FORCE UPDATE MODE ★★★
         // ============================================================
         function handleMessage(topic, payload) {
             state.packets++;
@@ -1089,11 +541,14 @@
                 return;
             }
 
-            // ★★★ FIX: Terima status mode dari ESP32 dan UPDATE UI ★★★
+            // ★★★ FIX: Terima status mode dari ESP32 dan FORCE UPDATE ★★★
             if (topic === TOPICS.statusPhMode) {
-                state.espMode = payload;
-                state.phMode = payload; // Sinkronkan state dengan ESP32
-                console.log('📥 Mode dari ESP32:', state.phMode);
+                const newMode = payload;
+                console.log('📥 Mode dari ESP32:', newMode);
+                
+                // ★★★ FORCE UPDATE state ★★★
+                state.phMode = newMode;
+                state.forceUpdate = true;
                 
                 // ★★★ FORCE RENDER ULANG ★★★
                 renderPhPanel();
@@ -1101,7 +556,7 @@
                 updateStatus();
                 
                 // Toast notifikasi
-                if (payload === 'manual') {
+                if (newMode === 'manual') {
                     toast('🔧 Mode MANUAL dari ESP32', 'warning');
                 } else {
                     toast('🤖 Mode AUTO dari ESP32', 'success');
@@ -1132,12 +587,12 @@
                     if (d.ph_target_max !== undefined) state.phTarget.max = parseFloat(d.ph_target_max);
                     if (d.fuzzy_strength !== undefined) state.fuzzy.strength = parseFloat(d.fuzzy_strength);
                     
-                    // ★★★ FIX: Update mode dari JSON ESP32 ★★★
+                    // ★★★ FIX: Update mode dari JSON ★★★
                     if (d.ph_mode !== undefined) {
-                        state.espMode = d.ph_mode;
-                        state.phMode = d.ph_mode;
-                        console.log('📥 Mode dari JSON:', state.phMode);
-                        // ★★★ FORCE RENDER ULANG ★★★
+                        const newMode = d.ph_mode;
+                        console.log('📥 Mode dari JSON:', newMode);
+                        state.phMode = newMode;
+                        state.forceUpdate = true;
                         renderPhPanel();
                         renderPumps();
                         updateStatus();
@@ -1179,7 +634,7 @@
         }
 
         // ============================================================
-        // PUBLISH - FIX: Cegah spam
+        // PUBLISH
         // ============================================================
         function publish(topic, value) {
             if (!client || !client.connected) {
@@ -1187,7 +642,6 @@
                 return false;
             }
             
-            // ★★★ FIX: Cegah spam mode ★★★
             if (topic === TOPICS.controlPhMode) {
                 const now = Date.now();
                 if (value === state.lastModeSent && (now - state.modeSendTime) < 2000) {
@@ -1217,9 +671,6 @@
             state.currentPreset = key;
             state.phTarget.min = p.phMin;
             state.phTarget.max = p.phMax;
-
-            dom.presetBadge.textContent = key === 'custom' ? '🎯 Manual' : '🌱 ' + p.name;
-            dom.presetBadge.className = key === 'custom' ? 'badge-sm neutral' : 'badge-sm active';
 
             const msg = JSON.stringify({ phMin: p.phMin, phMax: p.phMax, preset: key });
             publish(TOPICS.controlPreset, msg);
@@ -1334,7 +785,6 @@
                     const key = e.target.dataset.pump;
                     const val = e.target.checked;
                     
-                    // ★★★ FIX: Hanya izinkan jika mode manual ★★★
                     if (state.phMode !== 'manual') {
                         toast('⚠️ Ganti ke mode manual dulu!', 'warning');
                         e.target.checked = state.pumps[key];
@@ -1358,12 +808,18 @@
             dom.activePumps.textContent = active;
         }
 
+        // ============================================================
+        // ★★★ RENDER PH PANEL - FIX: FORCE UPDATE MODE ★★★
+        // ============================================================
         function renderPhPanel() {
             const ph = state.values.ph || 0;
             const { min, max } = state.phTarget;
             const inRange = ph >= min && ph <= max;
-            // ★★★ FIX: Gunakan state.phMode yang sudah sinkron ★★★
+            
+            // ★★★ FIX: Gunakan state.phMode langsung ★★★
             const isManual = state.phMode === 'manual';
+            console.log('🎯 Render PH Panel - Mode:', state.phMode, 'isManual:', isManual);
+            
             const up = state.pumps.phUp;
             const down = state.pumps.phDown;
             const f = state.fuzzy;
@@ -1383,24 +839,13 @@
             const barL = ((min - rangeMin) / (rangeMax - rangeMin)) * 100;
             const barW = ((max - min) / (rangeMax - rangeMin)) * 100;
 
-            // ★★★ FIX: Mode label yang jelas ★★★
             const modeLabel = isManual ? '🔧 MANUAL' : '🤖 AUTO';
             const modeHint = isManual ? 
                 'Mode Manual: Anda dapat mengontrol pH Up/Down secara manual.' : 
                 'Mode Auto: Sistem mengatur pH otomatis berdasarkan preset tanaman.';
-            
-            // ★★★ FIX: Badge mode ★★★
-            const modeBadgeClass = isManual ? 'badge-sm active' : 'badge-sm active';
-            const modeBadgeColor = isManual ? 'var(--warning)' : 'var(--success)';
-            dom.presetBadge.textContent = isManual ? '🔧 Manual' : '🤖 Auto';
-            dom.presetBadge.className = modeBadgeClass;
-            dom.presetBadge.style.background = isManual ? 'var(--warning-bg)' : 'var(--success-bg)';
-            dom.presetBadge.style.color = modeBadgeColor;
-            dom.presetBadge.style.border = '1px solid ' + (isManual ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)');
 
             dom.phPanel.innerHTML = `
                 <div class="left">
-                    <!-- Preset -->
                     <div class="preset-box">
                         <label><i class="fa-solid fa-seedling"></i> Preset Tanaman</label>
                         <select class="preset-select" id="presetSelect">${presetOpts}</select>
@@ -1412,13 +857,11 @@
                         </div>
                     </div>
 
-                    <!-- PH Readout -->
                     <div class="ph-readout">
                         <span class="val">${ph.toFixed(2)}</span>
                         <span class="state ${stateCls}">${stateText}</span>
                     </div>
 
-                    <!-- Range Visual -->
                     <div>
                         <div class="ph-range">
                             <div class="bar" style="left:${Math.max(barL,0)}%;width:${Math.min(barW,100)}%"></div>
@@ -1431,7 +874,6 @@
                         </div>
                     </div>
 
-                    <!-- Manual Target -->
                     <div class="target-box">
                         <label><i class="fa-solid fa-pen"></i> Target Manual (override preset)</label>
                         <div class="target-row">
@@ -1443,7 +885,7 @@
                 </div>
 
                 <div class="right">
-                    <!-- ★★★ FIX: Mode Buttons dengan indikator jelas ★★★ -->
+                    <!-- ★★★ FIX: Mode Buttons dengan indikator yang jelas ★★★ -->
                     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <div class="mode-group">
                             <button class="${!isManual ? 'active' : ''}" data-mode="auto">
@@ -1458,7 +900,6 @@
                         </span>
                     </div>
 
-                    <!-- Fuzzy -->
                     <div class="fuzzy-box" style="${isManual ? 'opacity:0.5;' : ''}">
                         <div class="title">Fuzzy Strength: ${(f.strength * 100).toFixed(0)}% ${isManual ? '(Nonaktif)' : ''}</div>
                         <div class="fuzzy-row">
@@ -1468,7 +909,6 @@
                         </div>
                     </div>
 
-                    <!-- Dose Buttons -->
                     <div class="dose-group">
                         <button class="dose-btn ${up ? 'on' : ''}" data-dose="phUp" ${isManual ? '' : 'disabled'}>
                             <i class="fa-solid fa-arrow-up"></i> ${up ? 'Matikan' : 'pH Up'}
@@ -1478,7 +918,6 @@
                         </button>
                     </div>
 
-                    <!-- Emergency Off -->
                     <button id="emergencyOffBtn" style="
                         width:100%;
                         padding:0.4rem;
@@ -1516,7 +955,7 @@
                 });
             }
 
-            // ★★★ FIX: Mode buttons - kirim perintah ke ESP32 ★★★
+            // ★★★ FIX: Mode buttons ★★★
             dom.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const mode = btn.dataset.mode;
@@ -1526,7 +965,6 @@
                     publish(TOPICS.controlPhMode, mode);
                     
                     if (mode === 'manual') {
-                        // Matikan pH pumps
                         state.pumps.phUp = false;
                         state.pumps.phDown = false;
                         publish(TOPICS.controlPhUp, 'OFF');
@@ -1537,11 +975,10 @@
                     }
                     
                     // ★★★ Jangan update state disini, tunggu balasan dari ESP32 ★★★
-                    // ESP32 akan kirim status melalui TOPICS.statusPhMode
                 });
             });
 
-            // Dose buttons (pH Up / pH Down)
+            // Dose buttons
             dom.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const key = btn.dataset.dose;
@@ -1661,6 +1098,17 @@
         console.log('🌱 Plant Presets:', PLANTS.map(p => p.name).join(', '));
         console.log('🔌 6 Relay:', PUMPS.map(p => p.name).join(', '));
         console.log('🔄 Mode akan sync dari ESP32');
+        
+        // ★★★ FIX: Periodic check untuk update mode ★★★
+        setInterval(() => {
+            if (state.forceUpdate) {
+                state.forceUpdate = false;
+                console.log('🔄 Force update mode:', state.phMode);
+                renderPhPanel();
+                renderPumps();
+                updateStatus();
+            }
+        }, 500);
     </script>
 </body>
 </html>
