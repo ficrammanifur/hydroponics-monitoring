@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2f7d4f" />
     <title>Hydroponic NFT — Dashboard Monitoring</title>
-    <meta name="description" content="Monitoring & kontrol sistem hidroponik NFT: TDS, suhu, pH, dan pompa nutrisi dengan kendali pH fuzzy secara real-time." />
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -17,751 +16,176 @@
     
     <style>
         /* ============================================================
-           HYDROPONIC NFT DASHBOARD - STYLE
+           RESET & VARIABLES
            ============================================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         :root {
             --bg-main: #0a0f1a;
-            --card-bg: #111827;
-            --card-border: #1f2937;
-            --text-main: #f1f5f9;
+            --bg-card: #111827;
+            --border: #1f2937;
+            --text: #f1f5f9;
             --text-muted: #94a3b8;
-            
             --primary: #10b981;
-            --primary-dark: #059669;
             --primary-bg: rgba(16, 185, 129, 0.15);
-            
             --success: #10b981;
             --success-bg: rgba(16, 185, 129, 0.15);
             --warning: #f59e0b;
             --warning-bg: rgba(245, 158, 11, 0.15);
             --danger: #ef4444;
             --danger-bg: rgba(239, 68, 68, 0.15);
-            
-            --neutral: #6b7280;
-            --neutral-bg: rgba(107, 114, 128, 0.15);
-            
+            --radius: 12px;
             --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
-            --radius: 16px;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Outfit', sans-serif;
             background: var(--bg-main);
-            color: var(--text-main);
+            color: var(--text);
             min-height: 100vh;
-            padding: 1.5rem;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
-            background-attachment: fixed;
+            padding: 1rem;
         }
 
-        .dashboard-wrapper {
+        .container {
             max-width: 1400px;
             margin: 0 auto;
         }
 
-        /* ============ HEADER ============ */
-        .app-header {
+        /* ============================================================
+           HEADER
+           ============================================================ */
+        .header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 1.25rem 2rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: var(--radius);
-            box-shadow: var(--shadow);
-            margin-bottom: 1.5rem;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.25rem;
             flex-wrap: wrap;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        .header-title {
+        .header-left {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         .header-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
+            width: 40px;
+            height: 40px;
             background: var(--primary-bg);
             color: var(--primary);
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.5rem;
+            font-size: 1.2rem;
         }
 
-        .header-title h1 {
-            font-size: 1.5rem;
-            font-weight: 800;
+        .header-left h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
             background: linear-gradient(135deg, var(--primary), #34d399);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
-        .header-title p {
+        .header-left p {
+            font-size: 0.7rem;
             color: var(--text-muted);
-            font-size: 0.85rem;
         }
 
-        .connection-panel {
+        .header-right {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             flex-wrap: wrap;
         }
 
-        .status-indicator {
+        .status-pill {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.4rem;
+            padding: 0.3rem 0.8rem;
             background: var(--bg-main);
             border-radius: 99px;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
 
         .dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             display: inline-block;
-            transition: all 0.3s ease;
         }
+        .dot.online { background: var(--success); box-shadow: 0 0 8px rgba(16,185,129,0.4); }
+        .dot.offline { background: var(--danger); }
+        .dot.connecting { background: var(--warning); animation: pulse 1s infinite; }
 
-        .dot.connected { background: var(--success); box-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
-        .dot.disconnected { background: var(--danger); }
-        .dot.connecting { background: var(--warning); animation: pulse-warning 1s infinite; }
-
-        @keyframes pulse-warning {
+        @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
 
-        .badges {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .badge {
-            padding: 0.25rem 0.75rem;
-            border-radius: 99px;
-            font-size: 0.65rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            transition: all 0.3s ease;
-        }
-
-        .badge.active {
-            background: var(--success-bg);
-            color: var(--success);
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .badge.inactive {
-            background: var(--danger-bg);
-            color: var(--danger);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .badge.neutral {
-            background: var(--neutral-bg);
-            color: var(--neutral);
-        }
-
-        .meta-info {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            display: flex;
-            gap: 1rem;
-        }
-
-        .meta-info i { margin-right: 0.25rem; }
-
-        .clock-display {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            padding: 0.5rem 1rem;
-            background: var(--bg-main);
-            border-radius: 99px;
-            border: 1px solid var(--card-border);
-        }
-
-        /* ============ GRID ============ */
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 1.25rem;
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: var(--radius);
-            padding: 1.5rem;
-            box-shadow: var(--shadow);
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-
-        .card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .card-title {
-            font-size: 0.8rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--text-muted);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card-title i { color: var(--primary); }
-
-        /* ============ STATUS CARD ============ */
-        .status-display {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
-            padding: 0.5rem 0;
-        }
-
-        .status-icon-wrapper {
-            width: 72px;
-            height: 72px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 2rem;
-            background: var(--neutral-bg);
-            color: var(--neutral);
-            transition: all 0.5s ease;
-            flex-shrink: 0;
-        }
-
-        .status-icon-wrapper.good { background: var(--success-bg); color: var(--success); }
-        .status-icon-wrapper.warning { background: var(--warning-bg); color: var(--warning); }
-        .status-icon-wrapper.bad { background: var(--danger-bg); color: var(--danger); }
-
-        .status-info h3 {
-            font-size: 1.5rem;
-            font-weight: 800;
-            margin-bottom: 0.25rem;
-        }
-
-        .status-info h3.good-text { color: var(--success); }
-        .status-info h3.warning-text { color: var(--warning); }
-        .status-info h3.bad-text { color: var(--danger); }
-
-        .status-info p { color: var(--text-muted); font-size: 0.9rem; }
-
-        /* ============ SENSOR PARAMETERS ============ */
-        .params-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-
-        .param-box {
-            background: var(--bg-main);
-            padding: 0.875rem 1rem;
-            border-radius: 12px;
-            border: 1px solid var(--card-border);
-            transition: all 0.3s ease;
-        }
-
-        .param-box:hover { border-color: var(--primary); }
-
-        .param-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 0.25rem;
-        }
-
-        .param-header i { color: var(--primary); margin-right: 0.25rem; }
-
-        .param-badge {
-            font-size: 0.6rem;
+        .badge-sm {
             padding: 0.15rem 0.5rem;
             border-radius: 99px;
+            font-size: 0.55rem;
             font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .param-badge.safe { background: var(--success-bg); color: var(--success); }
-        .param-badge.warn { background: var(--warning-bg); color: var(--warning); }
-        .param-badge.danger { background: var(--danger-bg); color: var(--danger); }
-        .param-badge.neutral { background: var(--neutral-bg); color: var(--neutral); }
-
-        .param-value {
-            font-size: 1.35rem;
-            font-weight: 700;
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .param-value .unit {
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            margin-left: 0.25rem;
-            font-family: 'Outfit', sans-serif;
-        }
-
-        /* ============ PUMP CONTROLS ============ */
-        .pump-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-
-        .pump-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.75rem 1rem;
-            background: var(--bg-main);
-            border-radius: 12px;
-            border: 1px solid var(--card-border);
-            transition: all 0.3s ease;
-        }
-
-        .pump-item:hover { border-color: var(--primary); }
-
-        .pump-item .pump-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .pump-item .pump-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--neutral-bg);
-            color: var(--neutral);
-            font-size: 0.9rem;
-            transition: all 0.3s ease;
-        }
-
-        .pump-item .pump-icon.on {
-            background: var(--success-bg);
-            color: var(--success);
-            animation: spin 2s linear infinite;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-
-        .pump-item .pump-name { font-size: 0.8rem; font-weight: 600; }
-        .pump-item .pump-pin { font-size: 0.65rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
-
-        .switch {
-            position: relative;
-            width: 40px;
-            height: 22px;
-            flex-shrink: 0;
-        }
-
-        .switch input { opacity: 0; width: 0; height: 0; }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            inset: 0;
-            background: var(--neutral);
-            border-radius: 99px;
-            transition: background 0.2s;
-        }
-
-        .slider::before {
-            content: "";
-            position: absolute;
-            height: 16px;
-            width: 16px;
-            left: 3px;
-            top: 3px;
-            background: #fff;
-            border-radius: 50%;
-            transition: transform 0.2s;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-
-        .switch input:checked + .slider { background: var(--primary); }
-        .switch input:checked + .slider::before { transform: translateX(18px); }
-
-        /* ============ PH PANEL with PLANT PRESET ============ */
-        .ph-panel {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .ph-left, .ph-right { display: flex; flex-direction: column; gap: 0.75rem; }
-
-        .ph-mode {
-            display: inline-flex;
-            background: var(--bg-main);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 4px;
-            gap: 4px;
-            align-self: flex-start;
-        }
-
-        .ph-mode button {
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            background: transparent;
-            border: none;
-            border-radius: 7px;
-            padding: 0.5rem 1rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            transition: all 0.15s;
-        }
-
-        .ph-mode button.active {
-            background: var(--card-bg);
-            color: var(--primary);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .ph-readout {
-            display: flex;
-            align-items: baseline;
-            gap: 0.75rem;
-        }
-
-        .ph-readout .val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
-        .ph-state {
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.25rem 0.75rem;
-            border-radius: 99px;
-        }
-
-        .ph-state.in-range { background: var(--success-bg); color: var(--success); }
-        .ph-state.low { background: var(--warning-bg); color: var(--warning); }
-        .ph-state.high { background: var(--danger-bg); color: var(--danger); }
-
-        /* ===== PLANT PRESET ===== */
-        .ph-preset-box {
-            background: var(--bg-main);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-        }
-
-        .ph-preset-box label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            display: block;
-            margin-bottom: 0.5rem;
         }
+        .badge-sm.active { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
+        .badge-sm.inactive { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
+        .badge-sm.neutral { background: var(--neutral-bg); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.2); }
 
-        .ph-preset-box label i {
-            color: var(--primary);
-            margin-right: 0.25rem;
-        }
-
-        .ph-preset-select {
-            width: 100%;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.85rem;
-            font-weight: 500;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            background: var(--card-bg);
-            color: var(--text-main);
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2394a3b8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 0.75rem center;
-            padding-right: 2rem;
-        }
-
-        .ph-preset-select option {
-            background: var(--card-bg);
-            color: var(--text-main);
-        }
-
-        .ph-preset-select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2);
-        }
-
-        .ph-preset-info {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-top: 0.5rem;
-            padding: 0.5rem 0.75rem;
-            background: var(--card-bg);
-            border-radius: 8px;
-            border: 1px solid var(--card-border);
-        }
-
-        .ph-preset-info .plant-icon {
-            font-size: 1.25rem;
-        }
-
-        .ph-preset-info .plant-detail {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .ph-preset-info .plant-name {
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-
-        .ph-preset-info .plant-range {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .ph-preset-info .plant-badge {
-            margin-left: auto;
-            font-size: 0.6rem;
-            padding: 0.15rem 0.5rem;
-            border-radius: 99px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .ph-preset-info .plant-badge.active {
-            background: var(--success-bg);
-            color: var(--success);
-        }
-
-        .ph-target-box {
-            background: var(--bg-main);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-        }
-
-        .ph-target-box label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            display: block;
-            margin-bottom: 0.5rem;
-        }
-
-        .ph-target-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .ph-target-row input[type="number"] {
-            width: 70px;
+        .clock {
             font-family: 'JetBrains Mono', monospace;
             font-size: 0.9rem;
             font-weight: 600;
-            padding: 0.4rem 0.6rem;
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            background: var(--card-bg);
-            color: var(--text-main);
-        }
-
-        .ph-target-row span { color: var(--text-muted); font-weight: 600; }
-
-        /* ===== PH RANGE VISUAL ===== */
-        .ph-range-visual {
-            position: relative;
-            height: 8px;
-            background: var(--card-border);
-            border-radius: 99px;
-            margin: 0.5rem 0;
-            overflow: visible;
-        }
-
-        .ph-range-visual .range-bar {
-            position: absolute;
-            top: 0;
-            height: 100%;
-            border-radius: 99px;
-            background: var(--primary);
-            opacity: 0.3;
-        }
-
-        .ph-range-visual .range-marker {
-            position: absolute;
-            top: -4px;
-            width: 4px;
-            height: 16px;
-            border-radius: 2px;
-            background: var(--primary);
-            transform: translateX(-50%);
-            transition: left 0.5s ease;
-            box-shadow: 0 0 12px rgba(16, 185, 129, 0.3);
-        }
-
-        .ph-range-labels {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.6rem;
             color: var(--text-muted);
-            font-family: 'JetBrains Mono', monospace;
-        }
-
-        .fuzzy-box {
+            padding: 0.3rem 0.8rem;
             background: var(--bg-main);
-            border: 1px solid var(--card-border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-        }
-
-        .fuzzy-box h4 {
-            font-size: 0.65rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-muted);
-            margin-bottom: 0.5rem;
-        }
-
-        .fuzzy-row {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.25rem;
-        }
-
-        .fuzzy-row:last-child { margin-bottom: 0; }
-
-        .fuzzy-name {
-            font-size: 0.7rem;
-            font-weight: 600;
-            width: 75px;
-            flex-shrink: 0;
-            color: var(--text-muted);
-        }
-
-        .fuzzy-bar {
-            flex: 1;
-            height: 6px;
             border-radius: 99px;
-            background: var(--card-border);
-            overflow: hidden;
+            border: 1px solid var(--border);
         }
 
-        .fuzzy-fill {
-            height: 100%;
-            background: var(--primary);
-            border-radius: 99px;
-            transition: width 0.4s ease;
-        }
-
-        .fuzzy-pct {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.65rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            width: 32px;
-            text-align: right;
-        }
-
-        .dose-btn {
-            width: 100%;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.75rem;
-            font-weight: 600;
-            padding: 0.5rem;
-            border-radius: 8px;
-            border: 1px solid var(--card-border);
-            background: var(--card-bg);
-            color: var(--text-main);
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .dose-btn:hover:not(:disabled) { border-color: var(--primary); }
-        .dose-btn.on { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
-        .dose-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-        .ph-hint {
-            font-size: 0.7rem;
-            color: var(--text-muted);
-            line-height: 1.5;
-        }
-
-        /* ============ CONN BAR ============ */
+        /* ============================================================
+           CONN BAR
+           ============================================================ */
         .conn-bar {
             display: flex;
             align-items: center;
             gap: 1.5rem;
-            padding: 0.75rem 1.25rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: var(--radius);
-            margin-bottom: 1.5rem;
+            padding: 0.6rem 1.25rem;
+            margin-bottom: 1.25rem;
             flex-wrap: wrap;
         }
 
         .conn-item {
             display: flex;
             flex-direction: column;
-            gap: 1px;
         }
-
-        .conn-k {
-            font-size: 0.6rem;
+        .conn-item .label {
+            font-size: 0.5rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             color: var(--text-muted);
             font-weight: 600;
         }
-
-        .conn-v {
-            font-size: 0.8rem;
+        .conn-item .value {
+            font-size: 0.75rem;
             font-weight: 600;
             font-family: 'JetBrains Mono', monospace;
         }
@@ -769,41 +193,495 @@
         .btn-reconnect {
             margin-left: auto;
             font-family: 'Outfit', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.4rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(16,185,129,0.3);
+            background: var(--primary-bg);
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-reconnect:hover { background: rgba(16,185,129,0.25); }
+        .btn-reconnect.danger { color: var(--danger); border-color: rgba(239,68,68,0.3); background: var(--danger-bg); }
+
+        /* ============================================================
+           GRID
+           ============================================================ */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1rem;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            box-shadow: var(--shadow);
+        }
+
+        .card-title {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .card-title i { color: var(--primary); }
+
+        .full-width { grid-column: 1 / -1; }
+
+        /* ============================================================
+           STATUS CARD
+           ============================================================ */
+        .status-display {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .status-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .status-icon.good { background: var(--success-bg); color: var(--success); }
+        .status-icon.warning { background: var(--warning-bg); color: var(--warning); }
+        .status-icon.danger { background: var(--danger-bg); color: var(--danger); }
+        .status-icon.neutral { background: var(--bg-main); color: var(--text-muted); }
+
+        .status-text h2 {
+            font-size: 1.5rem;
+            font-weight: 800;
+        }
+        .status-text h2.good { color: var(--success); }
+        .status-text h2.warning { color: var(--warning); }
+        .status-text h2.danger { color: var(--danger); }
+        .status-text h2.neutral { color: var(--text-muted); }
+        .status-text p { color: var(--text-muted); font-size: 0.85rem; }
+
+        /* ============================================================
+           SENSOR PARAMS
+           ============================================================ */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .sensor-item {
+            background: var(--bg-main);
+            padding: 0.75rem;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .sensor-item .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.2rem;
+        }
+        .sensor-item .header i { color: var(--primary); margin-right: 0.25rem; }
+
+        .sensor-item .value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+        .sensor-item .unit {
+            font-size: 0.7rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .badge-param {
+            font-size: 0.5rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 99px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge-param.safe { background: var(--success-bg); color: var(--success); }
+        .badge-param.warn { background: var(--warning-bg); color: var(--warning); }
+        .badge-param.danger { background: var(--danger-bg); color: var(--danger); }
+        .badge-param.neutral { background: var(--bg-main); color: var(--text-muted); }
+
+        /* ============================================================
+           PUMPS
+           ============================================================ */
+        .pump-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+        }
+
+        .pump-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            background: var(--bg-main);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .pump-item .info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .pump-item .icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-main);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            transition: all 0.3s;
+        }
+        .pump-item .icon.on {
+            background: var(--success-bg);
+            color: var(--success);
+            animation: spin 2s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .pump-item .name { font-size: 0.75rem; font-weight: 600; }
+        .pump-item .pin { font-size: 0.55rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            width: 34px;
+            height: 20px;
+            flex-shrink: 0;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--text-muted);
+            border-radius: 99px;
+            transition: 0.2s;
+        }
+        .toggle .slider::before {
+            content: "";
+            position: absolute;
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .toggle input:checked + .slider { background: var(--primary); }
+        .toggle input:checked + .slider::before { transform: translateX(14px); }
+
+        /* ============================================================
+           PH PANEL with PRESET
+           ============================================================ */
+        .ph-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .ph-grid .left,
+        .ph-grid .right {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        /* Preset Select */
+        .preset-box {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem;
+        }
+        .preset-box label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        .preset-box label i { color: var(--primary); margin-right: 0.25rem; }
+
+        .preset-select {
+            width: 100%;
+            padding: 0.4rem 0.7rem;
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%2394a3b8' d='M5 7L1 3h8z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.7rem center;
+            padding-right: 2rem;
+        }
+        .preset-select:focus { outline: none; border-color: var(--primary); }
+
+        .preset-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+            padding: 0.4rem 0.6rem;
+            background: var(--bg-card);
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .preset-info .emoji { font-size: 1rem; }
+        .preset-info .name { font-size: 0.8rem; font-weight: 600; }
+        .preset-info .range { font-size: 0.65rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+        .preset-info .status-badge {
+            margin-left: auto;
+            font-size: 0.55rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 99px;
+            font-weight: 700;
+        }
+        .preset-info .status-badge.ok { background: var(--success-bg); color: var(--success); }
+        .preset-info .status-badge.adjust { background: var(--warning-bg); color: var(--warning); }
+
+        /* PH Readout */
+        .ph-readout {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+        .ph-readout .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.2rem;
+            font-weight: 700;
+        }
+        .ph-readout .state {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.15rem 0.6rem;
+            border-radius: 99px;
+        }
+        .ph-readout .state.in-range { background: var(--success-bg); color: var(--success); }
+        .ph-readout .state.low { background: var(--warning-bg); color: var(--warning); }
+        .ph-readout .state.high { background: var(--danger-bg); color: var(--danger); }
+
+        /* PH Range Visual */
+        .ph-range {
+            position: relative;
+            height: 6px;
+            background: var(--border);
+            border-radius: 99px;
+            margin: 0.25rem 0;
+        }
+        .ph-range .bar {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            border-radius: 99px;
+            background: var(--primary);
+            opacity: 0.3;
+        }
+        .ph-range .marker {
+            position: absolute;
+            top: -3px;
+            width: 3px;
+            height: 12px;
+            border-radius: 2px;
+            background: var(--primary);
+            transform: translateX(-50%);
+            transition: left 0.5s ease;
+            box-shadow: 0 0 10px rgba(16,185,129,0.4);
+        }
+        .ph-range-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Target Manual */
+        .target-box {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.6rem 0.75rem;
+        }
+        .target-box label {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 0.3rem;
+        }
+        .target-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .target-row input {
+            width: 60px;
+            padding: 0.3rem 0.4rem;
+            background: var(--bg-card);
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: 'JetBrains Mono', monospace;
             font-size: 0.8rem;
             font-weight: 600;
-            color: var(--primary);
-            background: var(--primary-bg);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+        .target-row input:focus { outline: none; border-color: var(--primary); }
+        .target-row span { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
+
+        /* Mode Buttons */
+        .mode-group {
+            display: inline-flex;
+            background: var(--bg-main);
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 0.5rem 1rem;
+            padding: 3px;
+            gap: 3px;
+        }
+        .mode-group button {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
             cursor: pointer;
             transition: all 0.15s;
         }
-
-        .btn-reconnect:hover { background: rgba(16, 185, 129, 0.25); }
-        .btn-reconnect.reconnect { color: var(--danger); background: var(--danger-bg); border-color: rgba(239, 68, 68, 0.3); }
-
-        /* ============ RESPONSIVE ============ */
-        @media (max-width: 768px) {
-            body { padding: 0.75rem; }
-            .app-header { flex-direction: column; align-items: stretch; }
-            .connection-panel { flex-wrap: wrap; justify-content: center; }
-            .dashboard-grid { grid-template-columns: 1fr; }
-            .params-grid { grid-template-columns: 1fr; }
-            .ph-panel { grid-template-columns: 1fr; }
-            .pump-grid { grid-template-columns: 1fr; }
-            .conn-bar { flex-direction: column; align-items: stretch; gap: 0.5rem; }
-            .btn-reconnect { margin-left: 0; }
-            .clock-display { text-align: center; }
+        .mode-group button.active {
+            background: var(--bg-card);
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
 
-        @media (max-width: 480px) {
-            .status-display { flex-direction: column; text-align: center; }
-            .card { padding: 1rem; }
-            .ph-readout .val { font-size: 2rem; }
+        /* Fuzzy */
+        .fuzzy-box {
+            background: var(--bg-main);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.6rem 0.75rem;
+        }
+        .fuzzy-box .title {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.3rem;
+        }
+        .fuzzy-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .fuzzy-row .label { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); width: 60px; }
+        .fuzzy-row .bar {
+            flex: 1;
+            height: 5px;
+            background: var(--border);
+            border-radius: 99px;
+            overflow: hidden;
+        }
+        .fuzzy-row .bar .fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 99px;
+            transition: width 0.4s;
+        }
+        .fuzzy-row .pct {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            width: 32px;
+            text-align: right;
         }
 
-        /* ============ TOAST ============ */
+        /* Dose Buttons */
+        .dose-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+        .dose-btn {
+            flex: 1;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 0.4rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .dose-btn:hover:not(:disabled) { border-color: var(--primary); }
+        .dose-btn.on { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+        .dose-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .hint {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        /* ============================================================
+           RAW DATA
+           ============================================================ */
+        .code-block {
+            background: #0a0f1a;
+            color: #e2e8f0;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.6rem;
+            overflow-x: auto;
+            max-height: 150px;
+            overflow-y: auto;
+            line-height: 1.5;
+            border: 1px solid var(--border);
+            white-space: pre-wrap;
+        }
+
+        /* ============================================================
+           TOAST
+           ============================================================ */
         #toastContainer {
             position: fixed;
             bottom: 20px;
@@ -811,190 +689,156 @@
             z-index: 9999;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 6px;
         }
+        .toast {
+            padding: 0.6rem 1rem;
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.8rem;
+            font-weight: 500;
+            animation: slideIn 0.3s ease;
+            max-width: 380px;
+            font-family: 'Outfit', sans-serif;
+        }
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); }
+        .toast.info { background: #3b82f6; }
 
         @keyframes slideIn {
             from { transform: translateX(100%); opacity: 0; }
             to { transform: translateX(0); opacity: 1; }
         }
 
-        .grid-col-span-2 { grid-column: 1 / -1; }
-
-        /* ============ RAW DATA ============ */
-        .code-block {
-            background: #0a0f1a;
-            color: #e2e8f0;
-            padding: 1rem;
-            border-radius: 10px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.7rem;
-            overflow-x: auto;
-            max-height: 200px;
-            overflow-y: auto;
-            line-height: 1.6;
-            border: 1px solid #1f2937;
-            white-space: pre-wrap;
+        /* ============================================================
+           RESPONSIVE
+           ============================================================ */
+        @media (max-width: 768px) {
+            body { padding: 0.5rem; }
+            .header { flex-direction: column; align-items: stretch; }
+            .header-right { justify-content: center; }
+            .conn-bar { flex-direction: column; align-items: stretch; gap: 0.3rem; }
+            .btn-reconnect { margin-left: 0; }
+            .grid { grid-template-columns: 1fr; }
+            .sensor-grid { grid-template-columns: 1fr 1fr; }
+            .ph-grid { grid-template-columns: 1fr; }
+            .pump-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: 1; }
+            .status-display { flex-direction: column; text-align: center; }
         }
 
-        /* ============ STATUS BADGE ============ */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            border-radius: 99px;
-            font-size: 0.7rem;
-            font-weight: 600;
+        @media (max-width: 480px) {
+            .sensor-grid { grid-template-columns: 1fr; }
         }
-
-        .status-badge .led {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .status-badge .led.green { background: var(--success); }
-        .status-badge .led.yellow { background: var(--warning); }
-        .status-badge .led.red { background: var(--danger); }
-
-        .status-badge.success { background: var(--success-bg); color: var(--success); }
-        .status-badge.warning { background: var(--warning-bg); color: var(--warning); }
-        .status-badge.danger { background: var(--danger-bg); color: var(--danger); }
     </style>
 </head>
 <body>
-    <div class="dashboard-wrapper">
-        <!-- ========================= HEADER ========================= -->
-        <header class="app-header">
-            <div class="header-title">
-                <div class="header-icon">
-                    <i class="fa-solid fa-leaf"></i>
-                </div>
+    <div class="container">
+        <!-- ========== HEADER ========== -->
+        <header class="header">
+            <div class="header-left">
+                <div class="header-icon"><i class="fa-solid fa-leaf"></i></div>
                 <div>
                     <h1>Hydroponic NFT</h1>
                     <p>Dashboard Monitoring &amp; Kontrol</p>
                 </div>
             </div>
-            
-            <div class="connection-panel">
-                <div class="status-indicator">
-                    <span id="brokerDot" class="dot disconnected"></span>
+            <div class="header-right">
+                <div class="status-pill">
+                    <span class="dot" id="brokerDot"></span>
                     <span id="brokerStatus">Disconnected</span>
                 </div>
-                <div class="badges">
-                    <span id="mqttBadge" class="badge neutral">MQTT</span>
-                    <span id="espBadge" class="badge neutral">ESP32</span>
-                </div>
-                <div class="meta-info">
-                    <span><i class="fa-regular fa-clock"></i> <span id="lastUpdate">--:--:--</span></span>
-                    <span><i class="fa-solid fa-server"></i> <span id="dataCount">0</span> pkts</span>
-                </div>
-                <div class="clock-display" id="clock">--:--:--</div>
+                <span class="badge-sm neutral" id="mqttBadge">MQTT</span>
+                <span class="badge-sm neutral" id="espBadge">ESP32</span>
+                <span class="clock" id="clock">--:--:--</span>
             </div>
         </header>
 
-        <!-- ========================= CONN BAR ========================= -->
+        <!-- ========== CONN BAR ========== -->
         <div class="conn-bar">
             <div class="conn-item">
-                <span class="conn-k">Host</span>
-                <span class="conn-v" id="connHost">broker.hivemq.com</span>
+                <span class="label">Host</span>
+                <span class="value" id="connHost">broker.hivemq.com</span>
             </div>
             <div class="conn-item">
-                <span class="conn-k">Port</span>
-                <span class="conn-v" id="connPort">8884 (WSS)</span>
+                <span class="label">Port</span>
+                <span class="value" id="connPort">8884 (WSS)</span>
             </div>
             <div class="conn-item">
-                <span class="conn-k">Client ID</span>
-                <span class="conn-v" id="clientId">-</span>
+                <span class="label">Client ID</span>
+                <span class="value" id="clientId">-</span>
             </div>
             <div class="conn-item">
-                <span class="conn-k">Uptime</span>
-                <span class="conn-v" id="uptime">00:00:00</span>
+                <span class="label">Uptime</span>
+                <span class="value" id="uptime">00:00:00</span>
             </div>
             <div class="conn-item">
-                <span class="conn-k">Paket</span>
-                <span class="conn-v" id="pktCount">0</span>
+                <span class="label">Paket</span>
+                <span class="value" id="pktCount">0</span>
             </div>
             <button class="btn-reconnect" id="reconnectBtn">Sambungkan</button>
         </div>
 
-        <!-- ========================= MAIN GRID ========================= -->
-        <div class="dashboard-grid">
-            <!-- ===== STATUS CARD ===== -->
-            <section class="card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-water"></i> Status Air</span>
-                    <span id="statusBadge" class="badge neutral">MENUNGGU</span>
-                </div>
+        <!-- ========== GRID ========== -->
+        <div class="grid">
+            <!-- STATUS CARD -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-water"></i> Status Air</div>
                 <div class="status-display">
-                    <div id="statusIconWrapper" class="status-icon-wrapper">
+                    <div class="status-icon neutral" id="statusIcon">
                         <i class="fa-solid fa-hourglass-half"></i>
                     </div>
-                    <div class="status-info">
-                        <h3 id="waterStatusText" class="good-text">MENUNGGU</h3>
+                    <div class="status-text">
+                        <h2 class="neutral" id="waterStatus">MENUNGGU</h2>
                         <p id="statusDetail">Menunggu data dari ESP32...</p>
                     </div>
                 </div>
-            </section>
+            </div>
 
-            <!-- ===== SENSOR PARAMETERS ===== -->
-            <section class="card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-microchip"></i> Parameter Sensor</span>
-                </div>
-                <div class="params-grid" id="sensorGrid"></div>
-            </section>
+            <!-- SENSOR PARAMS -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-microchip"></i> Parameter Sensor</div>
+                <div class="sensor-grid" id="sensorGrid"></div>
+            </div>
 
-            <!-- ===== PUMP CONTROLS ===== -->
-            <section class="card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-plug"></i> Kontrol Pompa</span>
-                    <span class="badge neutral"><span id="activePumps">0</span> aktif</span>
-                </div>
+            <!-- PUMPS -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-plug"></i> Kontrol Pompa <span style="margin-left:auto;font-size:0.6rem;font-weight:400;color:var(--text-muted);">(<span id="activePumps">0</span> aktif)</span></div>
                 <div class="pump-grid" id="pumpGrid"></div>
-            </section>
+            </div>
 
-            <!-- ===== pH CONTROL with PLANT PRESET ===== -->
-            <section class="card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-flask"></i> Kontrol pH &amp; Preset Tanaman</span>
-                    <span id="plantPresetBadge" class="badge neutral">Manual</span>
-                </div>
-                <div class="ph-panel" id="phPanel"></div>
-            </section>
+            <!-- PH + PRESET -->
+            <div class="card">
+                <div class="card-title"><i class="fa-solid fa-flask"></i> Kontrol pH &amp; Preset Tanaman <span style="margin-left:auto;font-size:0.6rem;font-weight:400;color:var(--text-muted);" id="presetBadge">Manual</span></div>
+                <div class="ph-grid" id="phPanel"></div>
+            </div>
 
-            <!-- ===== RAW DATA ===== -->
-            <section class="card grid-col-span-2">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-code"></i> Data Telemetry</span>
-                </div>
-                <pre id="lastMessage" class="code-block">Menunggu data dari ESP32...</pre>
-            </section>
+            <!-- RAW DATA -->
+            <div class="card full-width">
+                <div class="card-title"><i class="fa-solid fa-code"></i> Data Telemetry</div>
+                <pre class="code-block" id="lastMessage">Menunggu data dari ESP32...</pre>
+            </div>
         </div>
     </div>
 
-    <!-- ========================= TOAST CONTAINER ========================= -->
+    <!-- ========== TOAST ========== -->
     <div id="toastContainer"></div>
 
-    <!-- ========================= MQTT LIBRARY ========================= -->
+    <!-- ========== MQTT ========== -->
     <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
     <script>
-        /* ==========================================================================
-           HYDROPONIC NFT DASHBOARD — MQTT Integration with PLANT PRESET
-           ========================================================================== */
-
-        // ==================== MQTT CONFIG ====================
-        const MQTT_BROKERS = [
+        // ============================================================
+        // CONFIG
+        // ============================================================
+        const BROKERS = [
             'wss://broker.hivemq.com:8884/mqtt',
             'wss://test.mosquitto.org:8081/mqtt',
             'wss://broker.emqx.io:8084/mqtt'
         ];
-        
-        let currentBrokerIndex = 0;
+        let brokerIdx = 0;
 
-        const MQTT_TOPICS = {
+        const TOPICS = {
             ph: 'hydroponic/riski/sensor/ph',
             tds: 'hydroponic/riski/sensor/tds',
             temp: 'hydroponic/riski/sensor/temp',
@@ -1019,30 +863,33 @@
             controlPhMode: 'hydroponic/riski/control/phmode'
         };
 
-        // ==================== PLANT PRESETS ====================
-        const PLANT_PRESETS = [
-            { key: "custom", name: "🎯 Manual", phMin: 5.8, phMax: 6.3 },
-            { key: "selada", name: "🥬 Selada", phMin: 6.0, phMax: 7.0 },
-            { key: "sawi", name: "🌿 Sawi", phMin: 5.5, phMax: 6.5 },
-            { key: "kangkung", name: "🌱 Kangkung", phMin: 5.5, phMax: 6.5 },
-            { key: "bayam", name: "🍃 Bayam", phMin: 6.0, phMax: 7.0 },
-            { key: "kailan", name: "🥦 Kailan", phMin: 5.5, phMax: 6.5 },
-            { key: "pakcoy", name: "🥬 Pakcoy", phMin: 6.8, phMax: 7.0 },
-            { key: "seledri", name: "🌿 Seledri", phMin: 6.3, phMax: 6.7 },
-            { key: "cabe", name: "🌶️ Cabe", phMin: 6.0, phMax: 6.5 },
-            { key: "peterseli", name: "🌿 Peterseli", phMin: 5.5, phMax: 6.0 },
-            { key: "strawberry", name: "🍓 Strawberry", phMin: 5.8, phMax: 6.2 },
-            { key: "ketimun", name: "🥒 Ketimun", phMin: 5.3, phMax: 5.7 },
+        // ============================================================
+        // PLANT PRESETS
+        // ============================================================
+        const PLANTS = [
+            { key: 'custom', name: '🎯 Manual', phMin: 5.8, phMax: 6.3 },
+            { key: 'selada', name: '🥬 Selada', phMin: 6.0, phMax: 7.0 },
+            { key: 'sawi', name: '🌿 Sawi', phMin: 5.5, phMax: 6.5 },
+            { key: 'kangkung', name: '🌱 Kangkung', phMin: 5.5, phMax: 6.5 },
+            { key: 'bayam', name: '🍃 Bayam', phMin: 6.0, phMax: 7.0 },
+            { key: 'kailan', name: '🥦 Kailan', phMin: 5.5, phMax: 6.5 },
+            { key: 'pakcoy', name: '🥬 Pakcoy', phMin: 6.8, phMax: 7.0 },
+            { key: 'seledri', name: '🌿 Seledri', phMin: 6.3, phMax: 6.7 },
+            { key: 'cabe', name: '🌶️ Cabe', phMin: 6.0, phMax: 6.5 },
+            { key: 'peterseli', name: '🌿 Peterseli', phMin: 5.5, phMax: 6.0 },
+            { key: 'strawberry', name: '🍓 Strawberry', phMin: 5.8, phMax: 6.2 },
+            { key: 'ketimun', name: '🥒 Ketimun', phMin: 5.3, phMax: 5.7 }
         ];
 
-        // ==================== SENSOR CONFIG ====================
+        // ============================================================
+        // SENSORS & PUMPS
+        // ============================================================
         const SENSORS = [
-            { key: 'ph', label: 'pH', unit: 'pH', decimals: 2, icon: 'fa-vial', min: 3, max: 10, idealMin: 5.5, idealMax: 7.0 },
-            { key: 'tds', label: 'TDS', unit: 'ppm', decimals: 0, icon: 'fa-water', min: 0, max: 2000, idealMin: 800, idealMax: 1400 },
-            { key: 'temp', label: 'Suhu', unit: '°C', decimals: 1, icon: 'fa-temperature-half', min: 10, max: 40, idealMin: 18, idealMax: 28 }
+            { key: 'ph', label: 'pH', unit: 'pH', dec: 2, icon: 'fa-vial' },
+            { key: 'tds', label: 'TDS', unit: 'ppm', dec: 0, icon: 'fa-water' },
+            { key: 'temp', label: 'Suhu', unit: '°C', dec: 1, icon: 'fa-temperature-half' }
         ];
 
-        // ==================== PUMP CONFIG ====================
         const PUMPS = [
             { key: 'aerator', name: 'Aerator', pin: 13, icon: 'fa-wind' },
             { key: 'sirkulasi1', name: 'Sirkulasi 1', pin: 14, icon: 'fa-arrows-rotate' },
@@ -1056,320 +903,260 @@
             { key: 'phDown', name: 'pH Down', pin: 25, icon: 'fa-arrow-down' }
         ];
 
-        // ==================== STATE ====================
+        // ============================================================
+        // STATE
+        // ============================================================
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
             pumps: { aerator: false, sirkulasi1: false, sirkulasi2: false, nutrisiA: false, nutrisiB: false, phUp: false, phDown: false },
             phMode: 'auto',
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
-            broker: 'connecting',
+            broker: 'offline',
             esp: 'waiting',
             packets: 0,
             startTime: Date.now(),
             mqttConnected: false,
-            hasReceivedData: false,
-            isConnecting: false,
-            reconnectAttempts: 0,
-            maxReconnectAttempts: 15,
-            usingBroker: 0,
+            hasData: false,
+            connecting: false,
+            attempts: 0,
             currentPreset: 'custom'
         };
 
-        let mqttClient = null;
+        let client = null;
 
-        // ==================== DOM REFS ====================
-        const DOM = {
-            brokerDot: document.getElementById('brokerDot'),
-            brokerStatus: document.getElementById('brokerStatus'),
-            espBadge: document.getElementById('espBadge'),
-            mqttBadge: document.getElementById('mqttBadge'),
-            lastUpdate: document.getElementById('lastUpdate'),
-            dataCount: document.getElementById('dataCount'),
-            lastMessage: document.getElementById('lastMessage'),
-            clock: document.getElementById('clock'),
-            uptime: document.getElementById('uptime'),
-            pktCount: document.getElementById('pktCount'),
-            clientId: document.getElementById('clientId'),
-            reconnectBtn: document.getElementById('reconnectBtn'),
-            connHost: document.getElementById('connHost'),
-            connPort: document.getElementById('connPort'),
-            sensorGrid: document.getElementById('sensorGrid'),
-            pumpGrid: document.getElementById('pumpGrid'),
-            phPanel: document.getElementById('phPanel'),
-            activePumps: document.getElementById('activePumps'),
-            waterStatusText: document.getElementById('waterStatusText'),
-            statusDetail: document.getElementById('statusDetail'),
-            statusIconWrapper: document.getElementById('statusIconWrapper'),
-            statusBadge: document.getElementById('statusBadge'),
-            plantPresetBadge: document.getElementById('plantPresetBadge')
+        // ============================================================
+        // DOM REFS
+        // ============================================================
+        const $ = id => document.getElementById(id);
+        const dom = {
+            brokerDot: $('brokerDot'),
+            brokerStatus: $('brokerStatus'),
+            mqttBadge: $('mqttBadge'),
+            espBadge: $('espBadge'),
+            clock: $('clock'),
+            uptime: $('uptime'),
+            pktCount: $('pktCount'),
+            clientId: $('clientId'),
+            connHost: $('connHost'),
+            connPort: $('connPort'),
+            reconnectBtn: $('reconnectBtn'),
+            sensorGrid: $('sensorGrid'),
+            pumpGrid: $('pumpGrid'),
+            phPanel: $('phPanel'),
+            activePumps: $('activePumps'),
+            statusIcon: $('statusIcon'),
+            waterStatus: $('waterStatus'),
+            statusDetail: $('statusDetail'),
+            lastMessage: $('lastMessage'),
+            presetBadge: $('presetBadge')
         };
 
-        // ==================== INIT ====================
+        // ============================================================
+        // INIT
+        // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('🌱 Hydroponic NFT Dashboard with Plant Preset');
-            console.log('📡 Broker:', MQTT_BROKERS[0]);
-            
-            DOM.connHost.textContent = 'broker.hivemq.com';
-            DOM.connPort.textContent = '8884 (WSS)';
-            
+            console.log('🌱 Hydroponic NFT Dashboard');
             renderSensors();
             renderPumps();
             renderPhPanel();
-            updateConnStatus();
-            
-            setTimeout(() => connectMQTT(), 1000);
-            setInterval(tickClock, 1000);
-            tickClock();
+            updateStatus();
+            setTimeout(connectMQTT, 1000);
+            setInterval(tick, 1000);
+            tick();
         });
 
-        // ==================== CONNECT MQTT ====================
+        // ============================================================
+        // CONNECT MQTT
+        // ============================================================
         function connectMQTT() {
-            if (state.isConnecting) return;
-            if (state.reconnectAttempts >= state.maxReconnectAttempts) {
-                showToast('❌ Gagal konek. Refresh halaman.', 'error');
+            if (state.connecting) return;
+            if (state.attempts >= 15) {
+                toast('❌ Gagal konek. Refresh halaman.', 'error');
                 return;
             }
-            
-            if (mqttClient && mqttClient.connected) {
-                mqttClient.end();
-                mqttClient = null;
-            }
-            
+
+            if (client && client.connected) { client.end(); client = null; }
+
             state.broker = 'connecting';
-            state.isConnecting = true;
-            state.reconnectAttempts++;
-            updateConnStatus();
-            
-            if (state.reconnectAttempts > 3 && currentBrokerIndex < MQTT_BROKERS.length - 1) {
-                currentBrokerIndex++;
-                const host = new URL(MQTT_BROKERS[currentBrokerIndex]).hostname;
-                DOM.connHost.textContent = host;
-                DOM.connPort.textContent = 'WSS';
-                console.log('🔄 Switching to broker:', MQTT_BROKERS[currentBrokerIndex]);
-                showToast('🔄 Mencoba broker alternatif...', 'info');
+            state.connecting = true;
+            state.attempts++;
+            updateStatus();
+
+            if (state.attempts > 3 && brokerIdx < BROKERS.length - 1) {
+                brokerIdx++;
+                dom.connHost.textContent = new URL(BROKERS[brokerIdx]).hostname;
+                dom.connPort.textContent = 'WSS';
+                toast('🔄 Coba broker alternatif...', 'info');
             }
-            
-            const brokerUrl = MQTT_BROKERS[currentBrokerIndex];
-            const clientId = 'dash_' + Math.random().toString(16).substr(2, 8);
-            state.clientId = clientId;
-            DOM.clientId.textContent = clientId;
-            
-            const options = {
-                clientId: clientId,
+
+            const url = BROKERS[brokerIdx];
+            const id = 'dash_' + Math.random().toString(16).substr(2, 8);
+            dom.clientId.textContent = id;
+
+            const opts = {
+                clientId: id,
                 clean: true,
                 reconnectPeriod: 3000,
                 keepAlive: 60,
                 connectTimeout: 15000,
-                will: { topic: MQTT_TOPICS.statusDashboard, payload: 'offline', qos: 1, retain: false }
+                will: { topic: TOPICS.statusDashboard, payload: 'offline', qos: 1, retain: false }
             };
-            
-            console.log('🔄 Connecting... (attempt', state.reconnectAttempts + ')');
-            console.log('📡 Broker:', brokerUrl);
-            showToast('🔄 Menghubungkan...', 'info');
-            
+
+            console.log('🔄 Connecting to', url);
+            toast('🔄 Menghubungkan...', 'info');
+
             try {
-                mqttClient = mqtt.connect(brokerUrl, options);
-                
-                mqttClient.on('connect', () => {
-                    console.log('✅ MQTT Connected to', brokerUrl);
+                client = mqtt.connect(url, opts);
+
+                client.on('connect', () => {
+                    console.log('✅ Connected');
                     state.broker = 'online';
                     state.mqttConnected = true;
-                    state.isConnecting = false;
-                    state.reconnectAttempts = 0;
+                    state.connecting = false;
+                    state.attempts = 0;
                     state.startTime = Date.now();
-                    updateConnStatus();
-                    showToast('✅ MQTT Terhubung!', 'success');
-                    
-                    const topics = [
-                        MQTT_TOPICS.ph, MQTT_TOPICS.tds, MQTT_TOPICS.temp,
-                        MQTT_TOPICS.all, MQTT_TOPICS.statusDevice,
-                        MQTT_TOPICS.statusAerator, MQTT_TOPICS.statusSirkulasi1,
-                        MQTT_TOPICS.statusSirkulasi2, MQTT_TOPICS.statusPhUp,
-                        MQTT_TOPICS.statusPhDown, MQTT_TOPICS.statusNutrisiA,
-                        MQTT_TOPICS.statusNutrisiB, MQTT_TOPICS.statusRequest
+                    updateStatus();
+                    toast('✅ MQTT Terhubung!', 'success');
+
+                    const subs = [
+                        TOPICS.ph, TOPICS.tds, TOPICS.temp, TOPICS.all,
+                        TOPICS.statusDevice, TOPICS.statusAerator, TOPICS.statusSirkulasi1,
+                        TOPICS.statusSirkulasi2, TOPICS.statusPhUp, TOPICS.statusPhDown,
+                        TOPICS.statusNutrisiA, TOPICS.statusNutrisiB
                     ];
-                    
-                    topics.forEach(t => {
-                        mqttClient.subscribe(t, { qos: 1 }, (err) => {
-                            if (!err) console.log('✅ Subscribed:', t);
-                        });
-                    });
-                    
-                    mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
-                    mqttClient.publish(MQTT_TOPICS.statusDashboard, 'online', { qos: 1 });
-                    
+                    subs.forEach(t => client.subscribe(t, { qos: 1 }));
+                    client.subscribe('hydroponic/riski/#', { qos: 1 });
+                    client.publish(TOPICS.statusDashboard, 'online', { qos: 1 });
+
                     setTimeout(() => {
-                        if (mqttClient && mqttClient.connected) {
-                            mqttClient.publish(MQTT_TOPICS.statusRequest, 'STATUS');
+                        if (client && client.connected) {
+                            client.publish(TOPICS.statusRequest, 'STATUS');
                         }
                     }, 1000);
                 });
-                
-                mqttClient.on('message', (topic, payload) => {
-                    handleMessage(topic, payload.toString());
-                });
-                
-                mqttClient.on('error', (err) => {
-                    console.error('❌ MQTT Error:', err.message);
+
+                client.on('message', (topic, payload) => handleMessage(topic, payload.toString()));
+
+                client.on('error', (err) => {
+                    console.error('❌ Error:', err.message);
                     state.broker = 'offline';
                     state.mqttConnected = false;
-                    state.isConnecting = false;
-                    updateConnStatus();
-                    
-                    if (err.message.includes('Connection refused') || err.message.includes('timeout')) {
-                        showToast('⚠️ Koneksi ditolak, coba lagi...', 'warning');
-                    } else {
-                        showToast('❌ Error: ' + err.message, 'error');
-                    }
-                    
-                    setTimeout(() => {
-                        if (!state.mqttConnected) connectMQTT();
-                    }, 5000);
+                    state.connecting = false;
+                    updateStatus();
+                    toast('❌ ' + err.message, 'error');
+                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
                 });
-                
-                mqttClient.on('offline', () => {
-                    console.log('⚠️ Offline');
+
+                client.on('offline', () => {
                     state.broker = 'offline';
                     state.mqttConnected = false;
-                    state.isConnecting = false;
-                    updateConnStatus();
+                    state.connecting = false;
+                    updateStatus();
                 });
-                
-                mqttClient.on('reconnect', () => {
-                    console.log('🔄 Reconnecting...');
-                    state.broker = 'connecting';
-                    updateConnStatus();
-                });
-                
-                mqttClient.on('close', () => {
-                    console.log('🔌 Closed');
+
+                client.on('close', () => {
                     state.broker = 'offline';
                     state.mqttConnected = false;
-                    state.isConnecting = false;
-                    updateConnStatus();
-                    setTimeout(() => {
-                        if (!state.mqttConnected) connectMQTT();
-                    }, 3000);
+                    state.connecting = false;
+                    updateStatus();
+                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 3000);
                 });
-                
+
             } catch (e) {
                 console.error('❌ Init error:', e);
                 state.broker = 'offline';
-                state.isConnecting = false;
-                updateConnStatus();
-                showToast('❌ Error: ' + e.message, 'error');
-                setTimeout(() => {
-                    if (!state.mqttConnected) connectMQTT();
-                }, 5000);
+                state.connecting = false;
+                updateStatus();
+                toast('❌ ' + e.message, 'error');
+                setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
             }
         }
 
-        // ==================== HANDLE MESSAGE ====================
+        // ============================================================
+        // HANDLE MESSAGE
+        // ============================================================
         function handleMessage(topic, payload) {
             state.packets++;
-            state.hasReceivedData = true;
-            DOM.dataCount.textContent = state.packets;
-            DOM.lastUpdate.textContent = new Date().toLocaleTimeString();
-            
-            if (topic === MQTT_TOPICS.statusDevice) {
+            state.hasData = true;
+            dom.pktCount.textContent = state.packets;
+
+            if (topic === TOPICS.statusDevice) {
                 state.esp = payload === 'online' ? 'active' : 'inactive';
-                updateConnStatus();
-                if (payload === 'online') showToast('✅ ESP32 Online!', 'success');
+                updateStatus();
+                if (payload === 'online') toast('✅ ESP32 Online!', 'success');
                 return;
             }
-            
-            if (topic === MQTT_TOPICS.all) {
+
+            if (topic === TOPICS.all) {
                 try {
-                    const data = JSON.parse(payload);
-                    DOM.lastMessage.textContent = JSON.stringify(data, null, 2);
-                    
-                    if (data.ph !== undefined) {
-                        state.values.ph = parseFloat(data.ph);
-                        updateSensorUI('ph', state.values.ph);
-                    }
-                    if (data.tds !== undefined) {
-                        state.values.tds = parseFloat(data.tds);
-                        updateSensorUI('tds', state.values.tds);
-                    }
-                    if (data.temperature !== undefined) {
-                        state.values.temp = parseFloat(data.temperature);
-                        updateSensorUI('temp', state.values.temp);
-                    }
-                    
-                    if (data.aerator !== undefined) state.pumps.aerator = data.aerator === 'ON';
-                    if (data.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = data.sirkulasi1 === 'ON';
-                    if (data.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = data.sirkulasi2 === 'ON';
-                    if (data.phup !== undefined) state.pumps.phUp = data.phup === 'ON';
-                    if (data.phdown !== undefined) state.pumps.phDown = data.phdown === 'ON';
-                    if (data.nutrisia !== undefined) state.pumps.nutrisiA = data.nutrisia === 'ON';
-                    if (data.nutrisib !== undefined) state.pumps.nutrisiB = data.nutrisib === 'ON';
-                    
-                    // Update target pH from ESP32
-                    if (data.ph_target_min !== undefined) {
-                        state.phTarget.min = parseFloat(data.ph_target_min);
-                    }
-                    if (data.ph_target_max !== undefined) {
-                        state.phTarget.max = parseFloat(data.ph_target_max);
-                    }
-                    if (data.fuzzy_strength !== undefined) {
-                        state.fuzzy.strength = parseFloat(data.fuzzy_strength);
-                    }
-                    if (data.ph_mode !== undefined) {
-                        state.phMode = data.ph_mode;
-                    }
-                    
+                    const d = JSON.parse(payload);
+                    dom.lastMessage.textContent = JSON.stringify(d, null, 2);
+
+                    if (d.ph !== undefined) { state.values.ph = parseFloat(d.ph); updateSensor('ph', state.values.ph); }
+                    if (d.tds !== undefined) { state.values.tds = parseFloat(d.tds); updateSensor('tds', state.values.tds); }
+                    if (d.temperature !== undefined) { state.values.temp = parseFloat(d.temperature);
+                        updateSensor('temp', state.values.temp); }
+
+                    if (d.aerator !== undefined) state.pumps.aerator = d.aerator === 'ON';
+                    if (d.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = d.sirkulasi1 === 'ON';
+                    if (d.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = d.sirkulasi2 === 'ON';
+                    if (d.phup !== undefined) state.pumps.phUp = d.phup === 'ON';
+                    if (d.phdown !== undefined) state.pumps.phDown = d.phdown === 'ON';
+                    if (d.nutrisia !== undefined) state.pumps.nutrisiA = d.nutrisia === 'ON';
+                    if (d.nutrisib !== undefined) state.pumps.nutrisiB = d.nutrisib === 'ON';
+
+                    if (d.ph_target_min !== undefined) state.phTarget.min = parseFloat(d.ph_target_min);
+                    if (d.ph_target_max !== undefined) state.phTarget.max = parseFloat(d.ph_target_max);
+                    if (d.fuzzy_strength !== undefined) state.fuzzy.strength = parseFloat(d.fuzzy_strength);
+                    if (d.ph_mode !== undefined) state.phMode = d.ph_mode;
+
                     renderPumps();
                     renderPhPanel();
-                    updateStatusUI();
-                    
+                    updateStatus();
+
                 } catch (e) {
-                    console.warn('⚠️ Parse error:', e);
-                    DOM.lastMessage.textContent = '❌ Parse error: ' + e.message + '\n\nRaw: ' + payload.substring(0, 200);
+                    dom.lastMessage.textContent = '❌ Parse error: ' + e.message + '\n\n' + payload.substring(0, 200);
                 }
                 return;
             }
-            
+
             // Individual sensors
-            const sensorMap = {
-                [MQTT_TOPICS.ph]: 'ph',
-                [MQTT_TOPICS.tds]: 'tds',
-                [MQTT_TOPICS.temp]: 'temp'
-            };
-            if (sensorMap[topic]) {
-                const val = parseFloat(payload);
-                if (!isNaN(val)) {
-                    state.values[sensorMap[topic]] = val;
-                    updateSensorUI(sensorMap[topic], val);
-                }
+            const map = { [TOPICS.ph]: 'ph', [TOPICS.tds]: 'tds', [TOPICS.temp]: 'temp' };
+            if (map[topic]) {
+                const v = parseFloat(payload);
+                if (!isNaN(v)) { state.values[map[topic]] = v;
+                    updateSensor(map[topic], v); }
                 return;
             }
-            
+
             // Pump status
-            const pumpMap = {
-                [MQTT_TOPICS.statusAerator]: 'aerator',
-                [MQTT_TOPICS.statusSirkulasi1]: 'sirkulasi1',
-                [MQTT_TOPICS.statusSirkulasi2]: 'sirkulasi2',
-                [MQTT_TOPICS.statusPhUp]: 'phUp',
-                [MQTT_TOPICS.statusPhDown]: 'phDown',
-                [MQTT_TOPICS.statusNutrisiA]: 'nutrisiA',
-                [MQTT_TOPICS.statusNutrisiB]: 'nutrisiB'
+            const pmap = {
+                [TOPICS.statusAerator]: 'aerator',
+                [TOPICS.statusSirkulasi1]: 'sirkulasi1',
+                [TOPICS.statusSirkulasi2]: 'sirkulasi2',
+                [TOPICS.statusPhUp]: 'phUp',
+                [TOPICS.statusPhDown]: 'phDown',
+                [TOPICS.statusNutrisiA]: 'nutrisiA',
+                [TOPICS.statusNutrisiB]: 'nutrisiB'
             };
-            if (pumpMap[topic]) {
-                state.pumps[pumpMap[topic]] = payload === 'ON';
+            if (pmap[topic]) {
+                state.pumps[pmap[topic]] = payload === 'ON';
                 renderPumps();
                 renderPhPanel();
             }
         }
 
-        // ==================== PUBLISH CONTROL ====================
-        function publishControl(topic, value) {
-            if (!mqttClient || !mqttClient.connected) {
-                showToast('⚠️ MQTT tidak terhubung!', 'warning');
+        // ============================================================
+        // PUBLISH
+        // ============================================================
+        function publish(topic, value) {
+            if (!client || !client.connected) {
+                toast('⚠️ MQTT tidak terhubung!', 'warning');
                 return false;
             }
             try {
-                mqttClient.publish(topic, value, { qos: 1 });
+                client.publish(topic, value, { qos: 1 });
                 console.log('📤', topic, '->', value);
                 return true;
             } catch (e) {
@@ -1378,335 +1165,53 @@
             }
         }
 
-        // ==================== APPLY PLANT PRESET ====================
-        function applyPlantPreset(presetKey) {
-            const preset = PLANT_PRESETS.find(p => p.key === presetKey);
-            if (!preset) return;
-            
-            state.currentPreset = presetKey;
-            state.phTarget.min = preset.phMin;
-            state.phTarget.max = preset.phMax;
-            
-            // Update badge
-            if (presetKey === 'custom') {
-                DOM.plantPresetBadge.textContent = '🎯 Manual';
-                DOM.plantPresetBadge.className = 'badge neutral';
-            } else {
-                DOM.plantPresetBadge.textContent = '🌱 ' + preset.name;
-                DOM.plantPresetBadge.className = 'badge active';
-            }
-            
-            // Kirim ke ESP32 via MQTT
-            const targetMsg = {
-                phMin: preset.phMin,
-                phMax: preset.phMax,
-                preset: presetKey
-            };
-            publishControl('hydroponic/riski/control/preset', JSON.stringify(targetMsg));
-            
-            showToast(`🌱 Preset ${preset.name} diterapkan (pH ${preset.phMin}-${preset.phMax})`, 'success');
+        // ============================================================
+        // APPLY PRESET
+        // ============================================================
+        function applyPreset(key) {
+            const p = PLANTS.find(x => x.key === key);
+            if (!p) return;
+            state.currentPreset = key;
+            state.phTarget.min = p.phMin;
+            state.phTarget.max = p.phMax;
+
+            dom.presetBadge.textContent = key === 'custom' ? '🎯 Manual' : '🌱 ' + p.name;
+            dom.presetBadge.className = key === 'custom' ? 'badge-sm neutral' : 'badge-sm active';
+
+            const msg = JSON.stringify({ phMin: p.phMin, phMax: p.phMax, preset: key });
+            publish('hydroponic/riski/control/preset', msg);
+            toast('🌱 Preset ' + p.name + ' (pH ' + p.phMin + '-' + p.phMax + ')', 'success');
             renderPhPanel();
-            updateStatusUI();
+            updateStatus();
         }
 
-        // ==================== RENDER FUNCTIONS ====================
+        // ============================================================
+        // RENDER FUNCTIONS
+        // ============================================================
 
-        function updateConnStatus() {
+        function updateStatus() {
             const online = state.broker === 'online';
-            DOM.brokerDot.className = 'dot ' + (online ? 'connected' : state.broker === 'connecting' ? 'connecting' : 'disconnected');
-            DOM.brokerStatus.textContent = online ? 'Terhubung' : state.broker === 'connecting' ? 'Menghubungkan...' : 'Terputus';
-            
+            dom.brokerDot.className = 'dot ' + (online ? 'online' : state.broker === 'connecting' ? 'connecting' : 'offline');
+            dom.brokerStatus.textContent = online ? 'Terhubung' : state.broker === 'connecting' ? 'Menghubungkan...' : 'Terputus';
+
+            dom.mqttBadge.className = 'badge-sm ' + (online ? 'active' : 'inactive');
+            dom.mqttBadge.textContent = 'MQTT';
             const espOk = online && state.esp === 'active';
-            DOM.mqttBadge.className = 'badge ' + (online ? 'active' : 'inactive');
-            DOM.espBadge.className = 'badge ' + (espOk ? 'active' : 'inactive');
-            DOM.mqttBadge.textContent = 'MQTT';
-            DOM.espBadge.textContent = 'ESP32';
-            
-            DOM.reconnectBtn.textContent = online ? 'Putuskan' : 'Sambungkan';
-            DOM.reconnectBtn.className = 'btn-reconnect' + (online ? '' : ' reconnect');
-        }
+            dom.espBadge.className = 'badge-sm ' + (espOk ? 'active' : 'inactive');
+            dom.espBadge.textContent = 'ESP32';
 
-        function updateSensorUI(key, value) {
-            const el = document.querySelector(`[data-sensor="${key}"] .param-value`);
-            if (el) {
-                const sensor = SENSORS.find(s => s.key === key);
-                el.innerHTML = value.toFixed(sensor.decimals) + ' <span class="unit">' + sensor.unit + '</span>';
-            }
-            const badge = document.getElementById(`badge_${key}`);
-            if (badge) {
-                const sensor = SENSORS.find(s => s.key === key);
-                const inRange = value >= sensor.idealMin && value <= sensor.idealMax;
-                if (inRange) {
-                    badge.textContent = 'Normal';
-                    badge.className = 'param-badge safe';
-                } else if (value < sensor.idealMin || value > sensor.idealMax) {
-                    badge.textContent = 'Warn';
-                    badge.className = 'param-badge warn';
-                } else {
-                    badge.textContent = '--';
-                    badge.className = 'param-badge neutral';
-                }
-            }
-        }
+            dom.reconnectBtn.textContent = online ? 'Putuskan' : 'Sambungkan';
+            dom.reconnectBtn.className = 'btn-reconnect' + (online ? '' : ' danger');
 
-        function renderSensors() {
-            DOM.sensorGrid.innerHTML = SENSORS.map(s => `
-                <div class="param-box" data-sensor="${s.key}">
-                    <div class="param-header">
-                        <span><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
-                        <span class="param-badge neutral" id="badge_${s.key}">--</span>
-                    </div>
-                    <div class="param-value">-- <span class="unit">${s.unit}</span></div>
-                </div>
-            `).join('');
-        }
-
-        function renderPumps() {
-            const allPumps = [...PUMPS, ...PH_PUMPS];
-            DOM.pumpGrid.innerHTML = allPumps.map(p => {
-                const on = state.pumps[p.key] || false;
-                return `
-                    <div class="pump-item">
-                        <div class="pump-info">
-                            <div class="pump-icon ${on ? 'on' : ''}">
-                                <i class="fa-solid ${p.icon}"></i>
-                            </div>
-                            <div>
-                                <div class="pump-name">${p.name}</div>
-                                <div class="pump-pin">GPIO ${p.pin}</div>
-                            </div>
-                        </div>
-                        <label class="switch">
-                            <input type="checkbox" ${on ? 'checked' : ''} data-pump="${p.key}" />
-                            <span class="slider"></span>
-                        </label>
-                    </div>
-                `;
-            }).join('');
-            
-            DOM.pumpGrid.querySelectorAll('[data-pump]').forEach(input => {
-                input.addEventListener('change', (e) => {
-                    const key = e.target.dataset.key || e.target.dataset.pump;
-                    const val = e.target.checked;
-                    state.pumps[key] = val;
-                    
-                    const pump = [...PUMPS, ...PH_PUMPS].find(p => p.key === key);
-                    if (pump) {
-                        const topicKey = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
-                        const topic = MQTT_TOPICS[topicKey];
-                        if (topic) publishControl(topic, val ? 'ON' : 'OFF');
-                    }
-                    renderPumps();
-                    renderPhPanel();
-                    updatePumpCount();
-                });
-            });
-            
-            updatePumpCount();
-        }
-
-        function updatePumpCount() {
-            const active = Object.values(state.pumps).filter(Boolean).length;
-            DOM.activePumps.textContent = active;
-        }
-
-        function renderPhPanel() {
-            const ph = state.values.ph || 0;
-            const { min, max } = state.phTarget;
-            const inRange = ph >= min && ph <= max;
-            const manual = state.phMode === 'manual';
-            const upActive = state.pumps.phUp;
-            const downActive = state.pumps.phDown;
-            const f = state.fuzzy;
-            
-            const stateClass = inRange ? 'in-range' : ph < min ? 'low' : 'high';
-            const stateText = inRange ? 'Dalam rentang' : ph < min ? 'Terlalu asam' : 'Terlalu basa';
-            
-            // Generate preset options
-            const presetOptions = PLANT_PRESETS.map(p => 
-                `<option value="${p.key}" ${state.currentPreset === p.key ? 'selected' : ''}>${p.name} (pH ${p.phMin}-${p.phMax})</option>`
-            ).join('');
-            
-            // Current preset info
-            const currentPreset = PLANT_PRESETS.find(p => p.key === state.currentPreset) || PLANT_PRESETS[0];
-            
-            // PH Range visual
-            const rangeMin = 3;
-            const rangeMax = 10;
-            const rangeWidth = 100;
-            const markerLeft = ((ph - rangeMin) / (rangeMax - rangeMin)) * rangeWidth;
-            const barLeft = ((min - rangeMin) / (rangeMax - rangeMin)) * rangeWidth;
-            const barWidth = ((max - min) / (rangeMax - rangeMin)) * rangeWidth;
-            
-            DOM.phPanel.innerHTML = `
-                <div class="ph-left">
-                    <!-- Plant Preset Dropdown -->
-                    <div class="ph-preset-box">
-                        <label><i class="fa-solid fa-seedling"></i> Preset Tanaman</label>
-                        <select class="ph-preset-select" id="presetSelect">
-                            ${presetOptions}
-                        </select>
-                        
-                        <div class="ph-preset-info">
-                            <span class="plant-icon">${currentPreset.key === 'custom' ? '🎯' : '🌱'}</span>
-                            <div class="plant-detail">
-                                <span class="plant-name">${currentPreset.name}</span>
-                                <span class="plant-range">Target pH: ${min.toFixed(1)} - ${max.toFixed(1)}</span>
-                            </div>
-                            <span class="plant-badge ${inRange ? 'active' : ''}">
-                                ${inRange ? '✅ Optimal' : '⚡ Adjusting'}
-                            </span>
-                        </div>
-                    </div>
-                    
-                    <!-- PH Readout -->
-                    <div class="ph-readout">
-                        <span class="val">${ph.toFixed(2)}</span>
-                        <span class="ph-state ${stateClass}">${stateText}</span>
-                    </div>
-                    
-                    <!-- PH Range Visual -->
-                    <div>
-                        <div class="ph-range-visual">
-                            <div class="range-bar" style="left:${barLeft}%;width:${barWidth}%"></div>
-                            <div class="range-marker" style="left:${Math.min(Math.max(markerLeft, 0), 100)}%"></div>
-                        </div>
-                        <div class="ph-range-labels">
-                            <span>${rangeMin}</span>
-                            <span>Target: ${min.toFixed(1)}-${max.toFixed(1)}</span>
-                            <span>${rangeMax}</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Manual Target -->
-                    <div class="ph-target-box">
-                        <label><i class="fa-solid fa-pen"></i> Target Manual (override preset)</label>
-                        <div class="ph-target-row">
-                            <input type="number" id="phMin" step="0.1" min="5.5" max="7.0" value="${min.toFixed(1)}" />
-                            <span>s/d</span>
-                            <input type="number" id="phMax" step="0.1" min="5.5" max="7.0" value="${max.toFixed(1)}" />
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="ph-right">
-                    <!-- Mode -->
-                    <div class="ph-mode">
-                        <button class="${state.phMode === 'auto' ? 'active' : ''}" data-mode="auto">
-                            <i class="fa-solid fa-robot"></i> Auto
-                        </button>
-                        <button class="${manual ? 'active' : ''}" data-mode="manual">
-                            <i class="fa-solid fa-hand"></i> Manual
-                        </button>
-                    </div>
-                    
-                    <!-- Fuzzy -->
-                    <div class="fuzzy-box">
-                        <h4>Fuzzy Strength: ${(f.strength * 100).toFixed(0)}%</h4>
-                        <div class="fuzzy-row">
-                            <span class="fuzzy-name">Koreksi</span>
-                            <span class="fuzzy-bar"><span class="fuzzy-fill" style="width:${(f.strength * 100).toFixed(0)}%"></span></span>
-                            <span class="fuzzy-pct">${(f.strength * 100).toFixed(0)}%</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Dose Buttons -->
-                    <div style="display:flex;gap:0.5rem;">
-                        <button class="dose-btn ${upActive ? 'on' : ''}" data-dose="phUp" ${manual ? '' : 'disabled'}>
-                            <i class="fa-solid fa-arrow-up"></i> ${upActive ? 'Matikan' : 'pH Up'}
-                        </button>
-                        <button class="dose-btn ${downActive ? 'on' : ''}" data-dose="phDown" ${manual ? '' : 'disabled'}>
-                            <i class="fa-solid fa-arrow-down"></i> ${downActive ? 'Matikan' : 'pH Down'}
-                        </button>
-                    </div>
-                    
-                    <p class="ph-hint">
-                        ${manual ? '🔧 Mode Manual: kontrol pH manual.' : 
-                          `🤖 Mode Auto: sistem mengatur pH otomatis berdasarkan preset tanaman.`}
-                    </p>
-                </div>
-            `;
-            
-            // ===== EVENTS =====
-            
-            // Preset Select
-            const presetSelect = DOM.phPanel.querySelector('#presetSelect');
-            if (presetSelect) {
-                presetSelect.addEventListener('change', (e) => {
-                    const key = e.target.value;
-                    if (key === 'custom') {
-                        // Biarkan user set manual
-                        state.currentPreset = 'custom';
-                        DOM.plantPresetBadge.textContent = '🎯 Manual';
-                        DOM.plantPresetBadge.className = 'badge neutral';
-                        showToast('🎯 Mode manual, atur target sendiri', 'info');
-                    } else {
-                        applyPlantPreset(key);
-                    }
-                    renderPhPanel();
-                });
-            }
-            
-            // Mode buttons
-            DOM.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    state.phMode = btn.dataset.mode;
-                    if (state.phMode === 'manual') {
-                        state.pumps.phUp = false;
-                        state.pumps.phDown = false;
-                        publishControl(MQTT_TOPICS.controlPhUp, 'OFF');
-                        publishControl(MQTT_TOPICS.controlPhDown, 'OFF');
-                    } else {
-                        publishControl(MQTT_TOPICS.controlPhMode, 'auto');
-                    }
-                    renderPhPanel();
-                    renderPumps();
-                });
-            });
-            
-            // Dose buttons
-            DOM.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const key = btn.dataset.dose;
-                    const next = !state.pumps[key];
-                    state.pumps.phUp = key === 'phUp' ? next : false;
-                    state.pumps.phDown = key === 'phDown' ? next : false;
-                    
-                    const topicKey = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
-                    publishControl(MQTT_TOPICS[topicKey], next ? 'ON' : 'OFF');
-                    renderPhPanel();
-                    renderPumps();
-                });
-            });
-            
-            // Manual target
-            const phMin = DOM.phPanel.querySelector('#phMin');
-            const phMax = DOM.phPanel.querySelector('#phMax');
-            if (phMin && phMax) {
-                [phMin, phMax].forEach(el => {
-                    el.addEventListener('change', () => {
-                        const mn = parseFloat(phMin.value) || 5.5;
-                        const mx = parseFloat(phMax.value) || 6.3;
-                        state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
-                        state.currentPreset = 'custom';
-                        DOM.plantPresetBadge.textContent = '🎯 Manual';
-                        DOM.plantPresetBadge.className = 'badge neutral';
-                        renderPhPanel();
-                    });
-                });
-            }
-        }
-
-        function updateStatusUI() {
+            // Status Air
             const ph = state.values.ph || 0;
             const inRange = ph >= state.phTarget.min && ph <= state.phTarget.max;
-            
-            let status = 'MENUNGGU';
-            let icon = 'fa-hourglass-half';
-            let cls = 'neutral';
-            let detail = 'Menunggu data...';
-            
-            if (state.hasReceivedData) {
+            let status = 'MENUNGGU',
+                icon = 'fa-hourglass-half',
+                cls = 'neutral',
+                detail = 'Menunggu data...';
+
+            if (state.hasData) {
                 if (inRange) {
                     status = 'LAYAK';
                     icon = 'fa-check-circle';
@@ -1720,96 +1225,315 @@
                 } else {
                     status = 'BASA';
                     icon = 'fa-circle-exclamation';
-                    cls = 'bad';
+                    cls = 'danger';
                     detail = 'pH terlalu tinggi!';
                 }
             }
-            
-            DOM.waterStatusText.textContent = status;
-            DOM.waterStatusText.className = cls + '-text';
-            DOM.statusDetail.textContent = detail;
-            DOM.statusIconWrapper.className = 'status-icon-wrapper ' + cls;
-            DOM.statusIconWrapper.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
-            DOM.statusBadge.textContent = status;
-            DOM.statusBadge.className = 'badge ' + (cls === 'good' ? 'active' : cls === 'neutral' ? 'neutral' : 'inactive');
+
+            dom.waterStatus.textContent = status;
+            dom.waterStatus.className = cls;
+            dom.statusDetail.textContent = detail;
+            dom.statusIcon.className = 'status-icon ' + cls;
+            dom.statusIcon.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
         }
 
-        // ==================== CLOCK ====================
-        function tickClock() {
-            const now = new Date();
-            DOM.clock.textContent = now.toLocaleTimeString();
-            
+        function updateSensor(key, value) {
+            const el = document.querySelector(`[data-sensor="${key}"] .val`);
+            if (el) {
+                const s = SENSORS.find(x => x.key === key);
+                el.textContent = value.toFixed(s.dec);
+            }
+            const badge = document.getElementById('badge_' + key);
+            if (badge) {
+                const s = SENSORS.find(x => x.key === key);
+                const ok = value >= s.idealMin && value <= s.idealMax;
+                if (ok) { badge.textContent = 'Normal';
+                    badge.className = 'badge-param safe'; } else { badge.textContent = 'Warn';
+                    badge.className = 'badge-param warn'; }
+            }
+        }
+
+        function renderSensors() {
+            dom.sensorGrid.innerHTML = SENSORS.map(s => `
+                <div class="sensor-item" data-sensor="${s.key}">
+                    <div class="header">
+                        <span><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
+                        <span class="badge-param neutral" id="badge_${s.key}">--</span>
+                    </div>
+                    <div class="value"><span class="val">--</span> <span class="unit">${s.unit}</span></div>
+                </div>
+            `).join('');
+        }
+
+        function renderPumps() {
+            const all = [...PUMPS, ...PH_PUMPS];
+            dom.pumpGrid.innerHTML = all.map(p => {
+                const on = state.pumps[p.key] || false;
+                return `
+                    <div class="pump-item">
+                        <div class="info">
+                            <div class="icon ${on ? 'on' : ''}"><i class="fa-solid ${p.icon}"></i></div>
+                            <div>
+                                <div class="name">${p.name}</div>
+                                <div class="pin">GPIO ${p.pin}</div>
+                            </div>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" ${on ? 'checked' : ''} data-pump="${p.key}" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+
+            dom.pumpGrid.querySelectorAll('[data-pump]').forEach(el => {
+                el.addEventListener('change', (e) => {
+                    const key = e.target.dataset.pump;
+                    const val = e.target.checked;
+                    state.pumps[key] = val;
+                    const pump = [...PUMPS, ...PH_PUMPS].find(p => p.key === key);
+                    if (pump) {
+                        const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                        publish(TOPICS[t], val ? 'ON' : 'OFF');
+                    }
+                    renderPumps();
+                    renderPhPanel();
+                    const active = Object.values(state.pumps).filter(Boolean).length;
+                    dom.activePumps.textContent = active;
+                });
+            });
+
+            const active = Object.values(state.pumps).filter(Boolean).length;
+            dom.activePumps.textContent = active;
+        }
+
+        function renderPhPanel() {
+            const ph = state.values.ph || 0;
+            const { min, max } = state.phTarget;
+            const inRange = ph >= min && ph <= max;
+            const manual = state.phMode === 'manual';
+            const up = state.pumps.phUp;
+            const down = state.pumps.phDown;
+            const f = state.fuzzy;
+
+            const stateCls = inRange ? 'in-range' : ph < min ? 'low' : 'high';
+            const stateText = inRange ? 'Dalam rentang' : ph < min ? 'Terlalu asam' : 'Terlalu basa';
+
+            const presetOpts = PLANTS.map(p =>
+                `<option value="${p.key}" ${state.currentPreset === p.key ? 'selected' : ''}>${p.name} (pH ${p.phMin}-${p.phMax})</option>`
+            ).join('');
+
+            const current = PLANTS.find(p => p.key === state.currentPreset) || PLANTS[0];
+
+            const rangeMin = 3,
+                rangeMax = 10;
+            const marker = ((ph - rangeMin) / (rangeMax - rangeMin)) * 100;
+            const barL = ((min - rangeMin) / (rangeMax - rangeMin)) * 100;
+            const barW = ((max - min) / (rangeMax - rangeMin)) * 100;
+
+            dom.phPanel.innerHTML = `
+                <div class="left">
+                    <!-- Preset -->
+                    <div class="preset-box">
+                        <label><i class="fa-solid fa-seedling"></i> Preset Tanaman</label>
+                        <select class="preset-select" id="presetSelect">${presetOpts}</select>
+                        <div class="preset-info">
+                            <span class="emoji">${current.key === 'custom' ? '🎯' : '🌱'}</span>
+                            <span class="name">${current.name}</span>
+                            <span class="range">Target: ${min.toFixed(1)} - ${max.toFixed(1)}</span>
+                            <span class="status-badge ${inRange ? 'ok' : 'adjust'}">${inRange ? '✅ Optimal' : '⚡ Adjust'}</span>
+                        </div>
+                    </div>
+
+                    <!-- PH Readout -->
+                    <div class="ph-readout">
+                        <span class="val">${ph.toFixed(2)}</span>
+                        <span class="state ${stateCls}">${stateText}</span>
+                    </div>
+
+                    <!-- Range Visual -->
+                    <div>
+                        <div class="ph-range">
+                            <div class="bar" style="left:${Math.max(barL,0)}%;width:${Math.min(barW,100)}%"></div>
+                            <div class="marker" style="left:${Math.min(Math.max(marker,0),100)}%"></div>
+                        </div>
+                        <div class="ph-range-labels">
+                            <span>${rangeMin}</span>
+                            <span>Target: ${min.toFixed(1)}-${max.toFixed(1)}</span>
+                            <span>${rangeMax}</span>
+                        </div>
+                    </div>
+
+                    <!-- Manual Target -->
+                    <div class="target-box">
+                        <label><i class="fa-solid fa-pen"></i> Target Manual (override preset)</label>
+                        <div class="target-row">
+                            <input type="number" id="phMin" step="0.1" min="5.5" max="7.0" value="${min.toFixed(1)}" />
+                            <span>s/d</span>
+                            <input type="number" id="phMax" step="0.1" min="5.5" max="7.0" value="${max.toFixed(1)}" />
+                        </div>
+                    </div>
+                </div>
+
+                <div class="right">
+                    <!-- Mode -->
+                    <div class="mode-group">
+                        <button class="${state.phMode === 'auto' ? 'active' : ''}" data-mode="auto">
+                            <i class="fa-solid fa-robot"></i> Auto
+                        </button>
+                        <button class="${manual ? 'active' : ''}" data-mode="manual">
+                            <i class="fa-solid fa-hand"></i> Manual
+                        </button>
+                    </div>
+
+                    <!-- Fuzzy -->
+                    <div class="fuzzy-box">
+                        <div class="title">Fuzzy Strength: ${(f.strength * 100).toFixed(0)}%</div>
+                        <div class="fuzzy-row">
+                            <span class="label">Koreksi</span>
+                            <span class="bar"><span class="fill" style="width:${(f.strength * 100).toFixed(0)}%"></span></span>
+                            <span class="pct">${(f.strength * 100).toFixed(0)}%</span>
+                        </div>
+                    </div>
+
+                    <!-- Dose -->
+                    <div class="dose-group">
+                        <button class="dose-btn ${up ? 'on' : ''}" data-dose="phUp" ${manual ? '' : 'disabled'}>
+                            <i class="fa-solid fa-arrow-up"></i> ${up ? 'Matikan' : 'pH Up'}
+                        </button>
+                        <button class="dose-btn ${down ? 'on' : ''}" data-dose="phDown" ${manual ? '' : 'disabled'}>
+                            <i class="fa-solid fa-arrow-down"></i> ${down ? 'Matikan' : 'pH Down'}
+                        </button>
+                    </div>
+
+                    <p class="hint">
+                        ${manual ? '🔧 Mode Manual: kontrol pH manual.' : '🤖 Mode Auto: sistem mengatur pH otomatis berdasarkan preset tanaman.'}
+                    </p>
+                </div>
+            `;
+
+            // Events
+            const sel = dom.phPanel.querySelector('#presetSelect');
+            if (sel) {
+                sel.addEventListener('change', (e) => {
+                    const key = e.target.value;
+                    if (key === 'custom') {
+                        state.currentPreset = 'custom';
+                        dom.presetBadge.textContent = '🎯 Manual';
+                        dom.presetBadge.className = 'badge-sm neutral';
+                        toast('🎯 Mode manual', 'info');
+                    } else {
+                        applyPreset(key);
+                    }
+                    renderPhPanel();
+                });
+            }
+
+            dom.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.phMode = btn.dataset.mode;
+                    if (state.phMode === 'manual') {
+                        state.pumps.phUp = false;
+                        state.pumps.phDown = false;
+                        publish(TOPICS.controlPhUp, 'OFF');
+                        publish(TOPICS.controlPhDown, 'OFF');
+                    } else {
+                        publish(TOPICS.controlPhMode, 'auto');
+                    }
+                    renderPhPanel();
+                    renderPumps();
+                });
+            });
+
+            dom.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.dataset.dose;
+                    const next = !state.pumps[key];
+                    state.pumps.phUp = key === 'phUp' ? next : false;
+                    state.pumps.phDown = key === 'phDown' ? next : false;
+                    const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                    publish(TOPICS[t], next ? 'ON' : 'OFF');
+                    renderPhPanel();
+                    renderPumps();
+                });
+            });
+
+            const minEl = dom.phPanel.querySelector('#phMin');
+            const maxEl = dom.phPanel.querySelector('#phMax');
+            if (minEl && maxEl) {
+                [minEl, maxEl].forEach(el => {
+                    el.addEventListener('change', () => {
+                        const mn = parseFloat(minEl.value) || 5.5;
+                        const mx = parseFloat(maxEl.value) || 6.3;
+                        state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
+                        state.currentPreset = 'custom';
+                        dom.presetBadge.textContent = '🎯 Manual';
+                        dom.presetBadge.className = 'badge-sm neutral';
+                        renderPhPanel();
+                        updateStatus();
+                    });
+                });
+            }
+        }
+
+        // ============================================================
+        // CLOCK
+        // ============================================================
+        function tick() {
+            dom.clock.textContent = new Date().toLocaleTimeString();
             if (state.broker === 'online') {
                 const s = Math.floor((Date.now() - state.startTime) / 1000);
-                DOM.uptime.textContent = 
+                dom.uptime.textContent =
                     String(Math.floor(s / 3600)).padStart(2, '0') + ':' +
                     String(Math.floor((s % 3600) / 60)).padStart(2, '0') + ':' +
                     String(s % 60).padStart(2, '0');
             }
-            DOM.pktCount.textContent = state.packets;
+            dom.pktCount.textContent = state.packets;
         }
 
-        // ==================== TOAST ====================
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            if (!container) {
-                const div = document.createElement('div');
-                div.id = 'toastContainer';
-                div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
-                document.body.appendChild(div);
-                return showToast(message, type);
-            }
-            
+        // ============================================================
+        // TOAST
+        // ============================================================
+        function toast(msg, type = 'info') {
+            const c = document.getElementById('toastContainer');
+            if (!c) return;
             const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
-            const toast = document.createElement('div');
-            toast.style.cssText = `
-                padding: 10px 16px;
-                border-radius: 10px;
-                color: white;
-                background: ${colors[type] || '#6b7280'};
-                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-                font-size: 0.85rem;
-                font-weight: 500;
-                animation: slideIn 0.3s ease;
-                max-width: 400px;
-                font-family: 'Outfit', sans-serif;
-            `;
-            toast.textContent = message;
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.3s';
-                setTimeout(() => toast.remove(), 300);
-            }, 4000);
+            const el = document.createElement('div');
+            el.className = 'toast ' + type;
+            el.textContent = msg;
+            c.appendChild(el);
+            setTimeout(() => { el.style.opacity = '0';
+                el.style.transition = 'opacity 0.3s';
+                setTimeout(() => el.remove(), 300); }, 3500);
         }
 
-        // ==================== RECONNECT ====================
-        DOM.reconnectBtn.addEventListener('click', () => {
+        // ============================================================
+        // RECONNECT
+        // ============================================================
+        dom.reconnectBtn.addEventListener('click', () => {
             if (state.broker === 'online') {
-                if (mqttClient) mqttClient.end();
+                if (client) client.end();
                 state.broker = 'offline';
                 state.mqttConnected = false;
-                updateConnStatus();
-                showToast('🔌 Terputus', 'info');
+                updateStatus();
+                toast('🔌 Terputus', 'info');
             } else {
-                state.reconnectAttempts = 0;
-                currentBrokerIndex = 0;
-                DOM.connHost.textContent = 'broker.hivemq.com';
+                state.attempts = 0;
+                brokerIdx = 0;
+                dom.connHost.textContent = 'broker.hivemq.com';
                 connectMQTT();
             }
         });
 
-        // ==================== INITIAL RENDER ====================
+        // ============================================================
+        // INIT RENDER
+        // ============================================================
         renderSensors();
         renderPumps();
         renderPhPanel();
-        updateConnStatus();
-        updateStatusUI();
-
-        console.log('✅ Dashboard ready with Plant Preset!');
-        console.log('🌱 Plant Presets:', PLANT_PRESETS.map(p => p.name).join(', '));
-        console.log('📡 Topics:', MQTT_TOPICS);
+        updateStatus();
+        console.log('✅ Dashboard ready!');
+        console.log('🌱 Plant Presets:', PLANTS.map(p => p.name).join(', '));
     </script>
 </body>
 </html>
