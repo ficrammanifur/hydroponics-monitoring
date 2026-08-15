@@ -1,120 +1,1466 @@
 <!DOCTYPE html>
 <html lang="id">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#2f7d4f" />
     <title>Hydroponic NFT — Dashboard Monitoring</title>
-    <meta
-      name="description"
-      content="Monitoring & kontrol sistem hidroponik NFT: TDS, suhu, pH, dan pompa nutrisi dengan kendali pH fuzzy secara real-time."
-    />
+    <meta name="description" content="Monitoring & kontrol sistem hidroponik NFT: TDS, suhu, pH, dan pompa nutrisi dengan kendali pH fuzzy secara real-time." />
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <!-- ============================= HEADER ============================= -->
-    <header class="site-header">
-      <div class="wrap header-inner">
-        <div class="brand">
-          <div class="brand-logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-              <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-            </svg>
-          </div>
-          <div>
-            <h1>Hidroponik NFT</h1>
-            <p class="brand-sub">Dashboard Monitoring &amp; Kontrol</p>
-          </div>
-        </div>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    
+    <style>
+        /* ============================================================
+           HYDROPONIC NFT DASHBOARD - STYLE
+           Inspired by Smart RO Monitor
+           ============================================================ */
+        :root {
+            --bg-main: #0a0f1a;
+            --card-bg: #111827;
+            --card-border: #1f2937;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --primary-bg: rgba(16, 185, 129, 0.15);
+            
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.15);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245, 158, 11, 0.15);
+            --danger: #ef4444;
+            --danger-bg: rgba(239, 68, 68, 0.15);
+            
+            --neutral: #6b7280;
+            --neutral-bg: rgba(107, 114, 128, 0.15);
+            
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            --radius: 16px;
+        }
 
-        <!-- Status koneksi broker & perangkat -->
-        <div class="status-cluster">
-          <div class="status-pill" id="brokerPill">
-            <span class="dot" id="brokerDot"></span>
-            <div class="status-text">
-              <span class="status-label">Broker MQTT</span>
-              <span class="status-value" id="brokerStatus">Menghubungkan…</span>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            padding: 1.5rem;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.08) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        .dashboard-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* ============ HEADER ============ */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.25rem 2rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: var(--primary-bg);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .header-title h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .connection-panel {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-main);
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+
+        .dot.connected { background: var(--success); box-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
+        .dot.disconnected { background: var(--danger); }
+        .dot.connecting { background: var(--warning); animation: pulse-warning 1s infinite; }
+
+        @keyframes pulse-warning {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .badges {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            transition: all 0.3s ease;
+        }
+
+        .badge.active {
+            background: var(--success-bg);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge.inactive {
+            background: var(--danger-bg);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge.neutral {
+            background: var(--neutral-bg);
+            color: var(--neutral);
+        }
+
+        .meta-info {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .meta-info i { margin-right: 0.25rem; }
+
+        .clock-display {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            padding: 0.5rem 1rem;
+            background: var(--bg-main);
+            border-radius: 99px;
+            border: 1px solid var(--card-border);
+        }
+
+        /* ============ GRID ============ */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 1.25rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .card-title i { color: var(--primary); }
+
+        /* ============ STATUS CARD ============ */
+        .status-display {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.5rem 0;
+        }
+
+        .status-icon-wrapper {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            background: var(--neutral-bg);
+            color: var(--neutral);
+            transition: all 0.5s ease;
+            flex-shrink: 0;
+        }
+
+        .status-icon-wrapper.good { background: var(--success-bg); color: var(--success); }
+        .status-icon-wrapper.warning { background: var(--warning-bg); color: var(--warning); }
+        .status-icon-wrapper.bad { background: var(--danger-bg); color: var(--danger); }
+
+        .status-info h3 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 0.25rem;
+        }
+
+        .status-info h3.good-text { color: var(--success); }
+        .status-info h3.warning-text { color: var(--warning); }
+        .status-info h3.bad-text { color: var(--danger); }
+
+        .status-info p { color: var(--text-muted); font-size: 0.9rem; }
+
+        /* ============ SENSOR PARAMETERS ============ */
+        .params-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .param-box {
+            background: var(--bg-main);
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            transition: all 0.3s ease;
+        }
+
+        .param-box:hover { border-color: var(--primary); }
+
+        .param-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .param-header i { color: var(--primary); margin-right: 0.25rem; }
+
+        .param-badge {
+            font-size: 0.6rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 99px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .param-badge.safe { background: var(--success-bg); color: var(--success); }
+        .param-badge.warn { background: var(--warning-bg); color: var(--warning); }
+        .param-badge.danger { background: var(--danger-bg); color: var(--danger); }
+        .param-badge.neutral { background: var(--neutral-bg); color: var(--neutral); }
+
+        .param-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .param-value .unit {
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            margin-left: 0.25rem;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* ============ FILTER / PUMP STATUS ============ */
+        .status-led {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .status-led.green { background: var(--success); box-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
+        .status-led.yellow { background: var(--warning); box-shadow: 0 0 12px rgba(245, 158, 11, 0.5); animation: pulse-yellow 1.5s infinite; }
+        .status-led.red { background: var(--danger); box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); animation: pulse-red 1s infinite; }
+
+        @keyframes pulse-yellow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* ============ PUMP CONTROLS ============ */
+        .pump-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .pump-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            background: var(--bg-main);
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            transition: all 0.3s ease;
+        }
+
+        .pump-item:hover { border-color: var(--primary); }
+
+        .pump-item .pump-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .pump-item .pump-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--neutral-bg);
+            color: var(--neutral);
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .pump-item .pump-icon.on {
+            background: var(--success-bg);
+            color: var(--success);
+            animation: spin 2s linear infinite;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .pump-item .pump-name { font-size: 0.8rem; font-weight: 600; }
+        .pump-item .pump-pin { font-size: 0.65rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+        /* Toggle Switch */
+        .switch {
+            position: relative;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .switch input { opacity: 0; width: 0; height: 0; }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: var(--neutral);
+            border-radius: 99px;
+            transition: background 0.2s;
+        }
+
+        .slider::before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .switch input:checked + .slider { background: var(--primary); }
+        .switch input:checked + .slider::before { transform: translateX(18px); }
+
+        /* ============ PH PANEL ============ */
+        .ph-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .ph-left, .ph-right { display: flex; flex-direction: column; gap: 0.75rem; }
+
+        .ph-mode {
+            display: inline-flex;
+            background: var(--bg-main);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 4px;
+            gap: 4px;
+            align-self: flex-start;
+        }
+
+        .ph-mode button {
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            background: transparent;
+            border: none;
+            border-radius: 7px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.15s;
+        }
+
+        .ph-mode button.active {
+            background: var(--card-bg);
+            color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .ph-readout {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+        }
+
+        .ph-readout .val {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .ph-state {
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+        }
+
+        .ph-state.in-range { background: var(--success-bg); color: var(--success); }
+        .ph-state.low { background: var(--warning-bg); color: var(--warning); }
+        .ph-state.high { background: var(--danger-bg); color: var(--danger); }
+
+        .ph-target-box {
+            background: var(--bg-main);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+        }
+
+        .ph-target-box label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .ph-target-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .ph-target-row input[type="number"] {
+            width: 70px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            font-weight: 600;
+            padding: 0.4rem 0.6rem;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-main);
+        }
+
+        .ph-target-row span { color: var(--text-muted); font-weight: 600; }
+
+        .ph-select {
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 500;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            background: var(--card-bg);
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        .ph-select option { background: var(--card-bg); }
+
+        .fuzzy-box {
+            background: var(--bg-main);
+            border: 1px solid var(--card-border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
+        }
+
+        .fuzzy-box h4 {
+            font-size: 0.65rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .fuzzy-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .fuzzy-row:last-child { margin-bottom: 0; }
+
+        .fuzzy-name {
+            font-size: 0.7rem;
+            font-weight: 600;
+            width: 75px;
+            flex-shrink: 0;
+            color: var(--text-muted);
+        }
+
+        .fuzzy-bar {
+            flex: 1;
+            height: 6px;
+            border-radius: 99px;
+            background: var(--card-border);
+            overflow: hidden;
+        }
+
+        .fuzzy-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 99px;
+            transition: width 0.4s ease;
+        }
+
+        .fuzzy-pct {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            width: 32px;
+            text-align: right;
+        }
+
+        .dose-btn {
+            width: 100%;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.5rem;
+            border-radius: 8px;
+            border: 1px solid var(--card-border);
+            background: var(--card-bg);
+            color: var(--text-main);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .dose-btn:hover:not(:disabled) { border-color: var(--primary); }
+        .dose-btn.on { background: var(--danger-bg); color: var(--danger); border-color: transparent; }
+        .dose-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .ph-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ============ CONN BAR ============ */
+        .conn-bar {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .conn-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+        }
+
+        .conn-k {
+            font-size: 0.6rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .conn-v {
+            font-size: 0.8rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .btn-reconnect {
+            margin-left: auto;
+            font-family: 'Outfit', sans-serif;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--primary);
+            background: var(--primary-bg);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-reconnect:hover { background: rgba(16, 185, 129, 0.25); }
+        .btn-reconnect.reconnect { color: var(--danger); background: var(--danger-bg); border-color: rgba(239, 68, 68, 0.3); }
+
+        /* ============ RESPONSIVE ============ */
+        @media (max-width: 768px) {
+            body { padding: 0.75rem; }
+            .app-header { flex-direction: column; align-items: stretch; }
+            .connection-panel { flex-wrap: wrap; justify-content: center; }
+            .dashboard-grid { grid-template-columns: 1fr; }
+            .params-grid { grid-template-columns: 1fr; }
+            .ph-panel { grid-template-columns: 1fr; }
+            .pump-grid { grid-template-columns: 1fr; }
+            .conn-bar { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+            .btn-reconnect { margin-left: 0; }
+            .clock-display { text-align: center; }
+        }
+
+        @media (max-width: 480px) {
+            .status-display { flex-direction: column; text-align: center; }
+            .card { padding: 1rem; }
+            .ph-readout .val { font-size: 2rem; }
+        }
+
+        /* ============ TOAST ============ */
+        #toastContainer {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .grid-col-span-2 { grid-column: 1 / -1; }
+    </style>
+</head>
+<body>
+    <div class="dashboard-wrapper">
+        <!-- ========================= HEADER ========================= -->
+        <header class="app-header">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fa-solid fa-leaf"></i>
+                </div>
+                <div>
+                    <h1>Hydroponic NFT</h1>
+                    <p>Dashboard Monitoring &amp; Kontrol</p>
+                </div>
             </div>
-          </div>
-          <div class="status-pill" id="espPill">
-            <span class="dot" id="espDot"></span>
-            <div class="status-text">
-              <span class="status-label">ESP32</span>
-              <span class="status-value" id="espStatus">Menunggu…</span>
+            
+            <div class="connection-panel">
+                <div class="status-indicator">
+                    <span id="brokerDot" class="dot disconnected"></span>
+                    <span id="brokerStatus">Disconnected</span>
+                </div>
+                <div class="badges">
+                    <span id="mqttBadge" class="badge neutral">MQTT</span>
+                    <span id="espBadge" class="badge neutral">ESP32</span>
+                </div>
+                <div class="meta-info">
+                    <span><i class="fa-regular fa-clock"></i> <span id="lastUpdate">--:--:--</span></span>
+                    <span><i class="fa-solid fa-server"></i> <span id="dataCount">0</span> pkts</span>
+                </div>
+                <div class="clock-display" id="clock">--:--:--</div>
             </div>
-          </div>
-          <div class="clock" id="clock">--:--:--</div>
-        </div>
-      </div>
-    </header>
+        </header>
 
-    <main class="wrap main">
-      <!-- ======================= INFO KONEKSI ======================= -->
-      <section class="conn-bar" aria-label="Informasi koneksi">
-        <div class="conn-item">
-          <span class="conn-k">Host</span>
-          <span class="conn-v mono" id="connHost">broker.hivemq.com</span>
+        <!-- ========================= CONN BAR ========================= -->
+        <div class="conn-bar">
+            <div class="conn-item">
+                <span class="conn-k">Host</span>
+                <span class="conn-v">broker.hivemq.com</span>
+            </div>
+            <div class="conn-item">
+                <span class="conn-k">Port</span>
+                <span class="conn-v">8084 (WSS)</span>
+            </div>
+            <div class="conn-item">
+                <span class="conn-k">Client ID</span>
+                <span class="conn-v" id="clientId">-</span>
+            </div>
+            <div class="conn-item">
+                <span class="conn-k">Uptime</span>
+                <span class="conn-v" id="uptime">00:00:00</span>
+            </div>
+            <div class="conn-item">
+                <span class="conn-k">Paket</span>
+                <span class="conn-v" id="pktCount">0</span>
+            </div>
+            <button class="btn-reconnect" id="reconnectBtn">Sambungkan</button>
         </div>
-        <div class="conn-item">
-          <span class="conn-k">Port</span>
-          <span class="conn-v mono">8084 (WSS)</span>
-        </div>
-        <div class="conn-item">
-          <span class="conn-k">Client ID</span>
-          <span class="conn-v mono" id="clientId">-</span>
-        </div>
-        <div class="conn-item">
-          <span class="conn-k">Uptime</span>
-          <span class="conn-v mono" id="uptime">00:00:00</span>
-        </div>
-        <div class="conn-item">
-          <span class="conn-k">Paket Diterima</span>
-          <span class="conn-v mono" id="pktCount">0</span>
-        </div>
-        <button class="btn-reconnect" id="reconnectBtn" type="button">Sambungkan</button>
-      </section>
 
-      <!-- ========================= SENSOR ========================= -->
-      <section aria-label="Pembacaan sensor">
-        <h2 class="section-title">Pembacaan Sensor</h2>
-        <div class="sensor-grid" id="sensorGrid"></div>
-      </section>
+        <!-- ========================= MAIN GRID ========================= -->
+        <div class="dashboard-grid">
+            <!-- ===== STATUS CARD ===== -->
+            <section class="card">
+                <div class="card-header">
+                    <span class="card-title"><i class="fa-solid fa-water"></i> Status Air</span>
+                    <span id="statusBadge" class="badge neutral">MENUNGGU</span>
+                </div>
+                <div class="status-display">
+                    <div id="statusIconWrapper" class="status-icon-wrapper">
+                        <i class="fa-solid fa-hourglass-half"></i>
+                    </div>
+                    <div class="status-info">
+                        <h3 id="waterStatusText" class="good-text">MENUNGGU</h3>
+                        <p id="statusDetail">Menunggu data dari ESP32...</p>
+                    </div>
+                </div>
+            </section>
 
-      <!-- ========================= KONTROL pH ========================= -->
-      <section aria-label="Kontrol pH" class="mt">
-        <h2 class="section-title">Kontrol pH Larutan Nutrisi (Fuzzy)</h2>
-        <div class="ph-panel" id="phPanel"></div>
-      </section>
+            <!-- ===== SENSOR PARAMETERS ===== -->
+            <section class="card">
+                <div class="card-header">
+                    <span class="card-title"><i class="fa-solid fa-microchip"></i> Parameter Sensor</span>
+                    <span id="sensorCount" class="badge neutral">0 aktif</span>
+                </div>
+                <div class="params-grid" id="sensorGrid"></div>
+            </section>
 
-      <!-- ========================= POMPA ========================= -->
-      <section aria-label="Kontrol pompa" class="mt">
-        <div class="section-head">
-          <h2 class="section-title mb0">Kontrol Pompa</h2>
-          <span class="badge-count"><span id="activePumps">0</span> aktif</span>
+            <!-- ===== PUMP CONTROLS ===== -->
+            <section class="card">
+                <div class="card-header">
+                    <span class="card-title"><i class="fa-solid fa-plug"></i> Kontrol Pompa</span>
+                    <span class="badge neutral"><span id="activePumps">0</span> aktif</span>
+                </div>
+                <div class="pump-grid" id="pumpGrid"></div>
+            </section>
+
+            <!-- ===== pH CONTROL ===== -->
+            <section class="card">
+                <div class="card-header">
+                    <span class="card-title"><i class="fa-solid fa-flask"></i> Kontrol pH (Fuzzy)</span>
+                </div>
+                <div class="ph-panel" id="phPanel"></div>
+            </section>
+
+            <!-- ===== RAW DATA ===== -->
+            <section class="card grid-col-span-2">
+                <div class="card-header">
+                    <span class="card-title"><i class="fa-solid fa-code"></i> Data Telemetry</span>
+                </div>
+                <pre id="lastMessage" style="
+                    background: #0a0f1a;
+                    color: #e2e8f0;
+                    padding: 1rem;
+                    border-radius: 10px;
+                    font-family: 'JetBrains Mono', monospace;
+                    font-size: 0.7rem;
+                    overflow-x: auto;
+                    max-height: 200px;
+                    overflow-y: auto;
+                    line-height: 1.6;
+                    border: 1px solid #1f2937;
+                    white-space: pre-wrap;
+                ">Menunggu data dari ESP32...</pre>
+            </section>
         </div>
-        <div class="pump-groups" id="pumpGroups"></div>
-      </section>
-
-      <footer class="foot">
-        <p>
-          Data real-time dari ESP32 via MQTT broker HiveMQ.
-          Gunakan dashboard ini untuk memonitor dan mengontrol sistem hidroponik NFT.
-        </p>
-      </footer>
-    </main>
+    </div>
 
     <!-- ========================= TOAST CONTAINER ========================= -->
     <div id="toastContainer"></div>
 
     <!-- ========================= MQTT LIBRARY ========================= -->
     <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
-    <script src="app.js"></script>
-  </body>
+    <script>
+        /* ==========================================================================
+           HYDROPONIC NFT DASHBOARD — MQTT Integration
+           ========================================================================== */
+
+        // ==================== MQTT CONFIG ====================
+        const MQTT_CONFIG = {
+            broker: 'wss://broker.hivemq.com:8084/mqtt',
+            topics: {
+                ph: 'hydroponic/riski/sensor/ph',
+                tds: 'hydroponic/riski/sensor/tds',
+                temp: 'hydroponic/riski/sensor/temp',
+                all: 'hydroponic/riski/sensor/all',
+                controlAerator: 'hydroponic/riski/control/aerator',
+                controlSirkulasi1: 'hydroponic/riski/control/sirkulasi1',
+                controlSirkulasi2: 'hydroponic/riski/control/sirkulasi2',
+                controlPhUp: 'hydroponic/riski/control/phup',
+                controlPhDown: 'hydroponic/riski/control/phdown',
+                controlNutrisiA: 'hydroponic/riski/control/nutrisia',
+                controlNutrisiB: 'hydroponic/riski/control/nutrisib',
+                statusAerator: 'hydroponic/riski/status/aerator',
+                statusSirkulasi1: 'hydroponic/riski/status/sirkulasi1',
+                statusSirkulasi2: 'hydroponic/riski/status/sirkulasi2',
+                statusPhUp: 'hydroponic/riski/status/phup',
+                statusPhDown: 'hydroponic/riski/status/phdown',
+                statusNutrisiA: 'hydroponic/riski/status/nutrisia',
+                statusNutrisiB: 'hydroponic/riski/status/nutrisib',
+                statusDevice: 'hydroponic/riski/status/device',
+                statusDashboard: 'hydroponic/riski/status/dashboard',
+                statusRequest: 'hydroponic/riski/status/request'
+            }
+        };
+
+        // ==================== SENSOR CONFIG ====================
+        const SENSORS = [
+            { key: 'ph', label: 'pH', unit: 'pH', decimals: 2, icon: 'fa-vial', min: 3, max: 10, idealMin: 5.5, idealMax: 7.0 },
+            { key: 'tds', label: 'TDS', unit: 'ppm', decimals: 0, icon: 'fa-water', min: 0, max: 2000, idealMin: 800, idealMax: 1400 },
+            { key: 'temp', label: 'Suhu', unit: '°C', decimals: 1, icon: 'fa-temperature-half', min: 10, max: 40, idealMin: 18, idealMax: 28 }
+        ];
+
+        // ==================== PUMP CONFIG ====================
+        const PUMPS = [
+            { key: 'aerator', name: 'Aerator', pin: 13, icon: 'fa-wind' },
+            { key: 'sirkulasi1', name: 'Sirkulasi 1', pin: 14, icon: 'fa-arrows-rotate' },
+            { key: 'sirkulasi2', name: 'Sirkulasi 2', pin: 27, icon: 'fa-arrows-rotate' },
+            { key: 'nutrisiA', name: 'Nutrisi A', pin: 33, icon: 'fa-flask' },
+            { key: 'nutrisiB', name: 'Nutrisi B', pin: 32, icon: 'fa-flask' }
+        ];
+
+        const PH_PUMPS = [
+            { key: 'phUp', name: 'pH Up', pin: 26, icon: 'fa-arrow-up' },
+            { key: 'phDown', name: 'pH Down', pin: 25, icon: 'fa-arrow-down' }
+        ];
+
+        // ==================== STATE ====================
+        const state = {
+            values: { ph: 0, tds: 0, temp: 0 },
+            pumps: { aerator: false, sirkulasi1: false, sirkulasi2: false, nutrisiA: false, nutrisiB: false, phUp: false, phDown: false },
+            phMode: 'auto',
+            phTarget: { min: 5.8, max: 6.3 },
+            fuzzy: { strength: 0 },
+            broker: 'connecting',
+            esp: 'waiting',
+            packets: 0,
+            startTime: Date.now(),
+            mqttConnected: false,
+            hasReceivedData: false,
+            isConnecting: false,
+            reconnectAttempts: 0,
+            maxReconnectAttempts: 10
+        };
+
+        let mqttClient = null;
+
+        // ==================== DOM REFS ====================
+        const DOM = {
+            brokerDot: document.getElementById('brokerDot'),
+            brokerStatus: document.getElementById('brokerStatus'),
+            espBadge: document.getElementById('espBadge'),
+            mqttBadge: document.getElementById('mqttBadge'),
+            lastUpdate: document.getElementById('lastUpdate'),
+            dataCount: document.getElementById('dataCount'),
+            lastMessage: document.getElementById('lastMessage'),
+            clock: document.getElementById('clock'),
+            uptime: document.getElementById('uptime'),
+            pktCount: document.getElementById('pktCount'),
+            clientId: document.getElementById('clientId'),
+            reconnectBtn: document.getElementById('reconnectBtn'),
+            sensorGrid: document.getElementById('sensorGrid'),
+            pumpGrid: document.getElementById('pumpGrid'),
+            phPanel: document.getElementById('phPanel'),
+            activePumps: document.getElementById('activePumps'),
+            waterStatusText: document.getElementById('waterStatusText'),
+            statusDetail: document.getElementById('statusDetail'),
+            statusIconWrapper: document.getElementById('statusIconWrapper'),
+            statusBadge: document.getElementById('statusBadge')
+        };
+
+        // ==================== INIT ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🌱 Hydroponic NFT Dashboard');
+            console.log('📡 Broker:', MQTT_CONFIG.broker);
+            
+            renderSensors();
+            renderPumps();
+            renderPhPanel();
+            updateConnStatus();
+            
+            setTimeout(() => connectMQTT(), 1000);
+            setInterval(tickClock, 1000);
+            tickClock();
+        });
+
+        // ==================== CONNECT MQTT ====================
+        function connectMQTT() {
+            if (state.isConnecting) return;
+            if (state.reconnectAttempts >= state.maxReconnectAttempts) {
+                showToast('❌ Gagal konek. Refresh halaman.', 'error');
+                return;
+            }
+            
+            if (mqttClient && mqttClient.connected) {
+                mqttClient.end();
+                mqttClient = null;
+            }
+            
+            state.broker = 'connecting';
+            state.isConnecting = true;
+            state.reconnectAttempts++;
+            updateConnStatus();
+            
+            const clientId = 'dash_' + Math.random().toString(16).substr(2, 8);
+            DOM.clientId.textContent = clientId;
+            
+            const options = {
+                clientId: clientId,
+                clean: true,
+                reconnectPeriod: 5000,
+                keepAlive: 60,
+                connectTimeout: 30000,
+                will: { topic: MQTT_CONFIG.topics.statusDashboard, payload: 'offline', qos: 1, retain: false }
+            };
+            
+            console.log('🔄 Connecting... (attempt', state.reconnectAttempts + ')');
+            showToast('🔄 Menghubungkan...', 'info');
+            
+            try {
+                mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
+                
+                mqttClient.on('connect', () => {
+                    console.log('✅ MQTT Connected');
+                    state.broker = 'online';
+                    state.mqttConnected = true;
+                    state.isConnecting = false;
+                    state.reconnectAttempts = 0;
+                    state.startTime = Date.now();
+                    updateConnStatus();
+                    showToast('✅ MQTT Terhubung!', 'success');
+                    
+                    const topics = [
+                        MQTT_CONFIG.topics.ph, MQTT_CONFIG.topics.tds, MQTT_CONFIG.topics.temp,
+                        MQTT_CONFIG.topics.all, MQTT_CONFIG.topics.statusDevice,
+                        MQTT_CONFIG.topics.statusAerator, MQTT_CONFIG.topics.statusSirkulasi1,
+                        MQTT_CONFIG.topics.statusSirkulasi2, MQTT_CONFIG.topics.statusPhUp,
+                        MQTT_CONFIG.topics.statusPhDown, MQTT_CONFIG.topics.statusNutrisiA,
+                        MQTT_CONFIG.topics.statusNutrisiB
+                    ];
+                    
+                    topics.forEach(t => mqttClient.subscribe(t, { qos: 1 }));
+                    mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
+                    mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1 });
+                    
+                    setTimeout(() => {
+                        if (mqttClient && mqttClient.connected) {
+                            mqttClient.publish(MQTT_CONFIG.topics.statusRequest, 'STATUS');
+                        }
+                    }, 1000);
+                });
+                
+                mqttClient.on('message', (topic, payload) => {
+                    handleMessage(topic, payload.toString());
+                });
+                
+                mqttClient.on('error', (err) => {
+                    console.error('❌ MQTT Error:', err);
+                    state.broker = 'offline';
+                    state.mqttConnected = false;
+                    state.isConnecting = false;
+                    updateConnStatus();
+                    showToast('❌ Error: ' + err.message, 'error');
+                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
+                });
+                
+                mqttClient.on('offline', () => {
+                    console.log('⚠️ Offline');
+                    state.broker = 'offline';
+                    state.mqttConnected = false;
+                    state.isConnecting = false;
+                    updateConnStatus();
+                });
+                
+                mqttClient.on('close', () => {
+                    console.log('🔌 Closed');
+                    state.broker = 'offline';
+                    state.mqttConnected = false;
+                    state.isConnecting = false;
+                    updateConnStatus();
+                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 3000);
+                });
+                
+            } catch (e) {
+                console.error('❌ Init error:', e);
+                state.broker = 'offline';
+                state.isConnecting = false;
+                updateConnStatus();
+                setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
+            }
+        }
+
+        // ==================== HANDLE MESSAGE ====================
+        function handleMessage(topic, payload) {
+            state.packets++;
+            state.hasReceivedData = true;
+            DOM.dataCount.textContent = state.packets;
+            DOM.lastUpdate.textContent = new Date().toLocaleTimeString();
+            
+            if (topic === MQTT_CONFIG.topics.statusDevice) {
+                state.esp = payload === 'online' ? 'active' : 'inactive';
+                updateConnStatus();
+                if (payload === 'online') showToast('✅ ESP32 Online!', 'success');
+                return;
+            }
+            
+            if (topic === MQTT_CONFIG.topics.all) {
+                try {
+                    const data = JSON.parse(payload);
+                    DOM.lastMessage.textContent = JSON.stringify(data, null, 2);
+                    
+                    if (data.ph !== undefined) {
+                        state.values.ph = parseFloat(data.ph);
+                        updateSensorUI('ph', state.values.ph);
+                    }
+                    if (data.tds !== undefined) {
+                        state.values.tds = parseFloat(data.tds);
+                        updateSensorUI('tds', state.values.tds);
+                    }
+                    if (data.temperature !== undefined) {
+                        state.values.temp = parseFloat(data.temperature);
+                        updateSensorUI('temp', state.values.temp);
+                    }
+                    
+                    if (data.aerator !== undefined) state.pumps.aerator = data.aerator === 'ON';
+                    if (data.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = data.sirkulasi1 === 'ON';
+                    if (data.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = data.sirkulasi2 === 'ON';
+                    if (data.phup !== undefined) state.pumps.phUp = data.phup === 'ON';
+                    if (data.phdown !== undefined) state.pumps.phDown = data.phdown === 'ON';
+                    if (data.nutrisia !== undefined) state.pumps.nutrisiA = data.nutrisia === 'ON';
+                    if (data.nutrisib !== undefined) state.pumps.nutrisiB = data.nutrisib === 'ON';
+                    
+                    renderPumps();
+                    renderPhPanel();
+                    updateStatusUI();
+                    
+                } catch (e) {
+                    console.warn('⚠️ Parse error:', e);
+                }
+                return;
+            }
+            
+            // Individual sensors
+            const sensorMap = {
+                [MQTT_CONFIG.topics.ph]: 'ph',
+                [MQTT_CONFIG.topics.tds]: 'tds',
+                [MQTT_CONFIG.topics.temp]: 'temp'
+            };
+            if (sensorMap[topic]) {
+                const val = parseFloat(payload);
+                if (!isNaN(val)) {
+                    state.values[sensorMap[topic]] = val;
+                    updateSensorUI(sensorMap[topic], val);
+                }
+                return;
+            }
+            
+            // Pump status
+            const pumpMap = {
+                [MQTT_CONFIG.topics.statusAerator]: 'aerator',
+                [MQTT_CONFIG.topics.statusSirkulasi1]: 'sirkulasi1',
+                [MQTT_CONFIG.topics.statusSirkulasi2]: 'sirkulasi2',
+                [MQTT_CONFIG.topics.statusPhUp]: 'phUp',
+                [MQTT_CONFIG.topics.statusPhDown]: 'phDown',
+                [MQTT_CONFIG.topics.statusNutrisiA]: 'nutrisiA',
+                [MQTT_CONFIG.topics.statusNutrisiB]: 'nutrisiB'
+            };
+            if (pumpMap[topic]) {
+                state.pumps[pumpMap[topic]] = payload === 'ON';
+                renderPumps();
+                renderPhPanel();
+            }
+        }
+
+        // ==================== PUBLISH CONTROL ====================
+        function publishControl(topic, value) {
+            if (!mqttClient || !mqttClient.connected) {
+                showToast('⚠️ MQTT tidak terhubung!', 'warning');
+                return false;
+            }
+            try {
+                mqttClient.publish(topic, value, { qos: 1 });
+                console.log('📤', topic, '->', value);
+                return true;
+            } catch (e) {
+                console.error('❌ Publish error:', e);
+                return false;
+            }
+        }
+
+        // ==================== RENDER FUNCTIONS ====================
+
+        function updateConnStatus() {
+            const online = state.broker === 'online';
+            DOM.brokerDot.className = 'dot ' + (online ? 'connected' : state.broker === 'connecting' ? 'connecting' : 'disconnected');
+            DOM.brokerStatus.textContent = online ? 'Terhubung' : state.broker === 'connecting' ? 'Menghubungkan...' : 'Terputus';
+            
+            const espOk = online && state.esp === 'active';
+            DOM.mqttBadge.className = 'badge ' + (online ? 'active' : 'inactive');
+            DOM.espBadge.className = 'badge ' + (espOk ? 'active' : 'inactive');
+            DOM.mqttBadge.textContent = 'MQTT';
+            DOM.espBadge.textContent = 'ESP32';
+            
+            DOM.reconnectBtn.textContent = online ? 'Putuskan' : 'Sambungkan';
+            DOM.reconnectBtn.className = 'btn-reconnect' + (online ? '' : ' reconnect');
+        }
+
+        function updateSensorUI(key, value) {
+            const el = document.querySelector(`[data-sensor="${key}"] .param-value`);
+            if (el) {
+                const sensor = SENSORS.find(s => s.key === key);
+                el.innerHTML = value.toFixed(sensor.decimals) + ' <span class="unit">' + sensor.unit + '</span>';
+            }
+        }
+
+        function renderSensors() {
+            DOM.sensorGrid.innerHTML = SENSORS.map(s => `
+                <div class="param-box" data-sensor="${s.key}">
+                    <div class="param-header">
+                        <span><i class="fa-solid ${s.icon}"></i> ${s.label}</span>
+                        <span class="param-badge neutral" id="badge_${s.key}">--</span>
+                    </div>
+                    <div class="param-value">-- <span class="unit">${s.unit}</span></div>
+                </div>
+            `).join('');
+        }
+
+        function renderPumps() {
+            const allPumps = [...PUMPS, ...PH_PUMPS];
+            DOM.pumpGrid.innerHTML = allPumps.map(p => {
+                const on = state.pumps[p.key] || false;
+                return `
+                    <div class="pump-item">
+                        <div class="pump-info">
+                            <div class="pump-icon ${on ? 'on' : ''}">
+                                <i class="fa-solid ${p.icon}"></i>
+                            </div>
+                            <div>
+                                <div class="pump-name">${p.name}</div>
+                                <div class="pump-pin">GPIO ${p.pin}</div>
+                            </div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" ${on ? 'checked' : ''} data-pump="${p.key}" />
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                `;
+            }).join('');
+            
+            DOM.pumpGrid.querySelectorAll('[data-pump]').forEach(input => {
+                input.addEventListener('change', (e) => {
+                    const key = e.target.dataset.pump;
+                    const val = e.target.checked;
+                    state.pumps[key] = val;
+                    
+                    const pump = [...PUMPS, ...PH_PUMPS].find(p => p.key === key);
+                    if (pump) {
+                        const topic = MQTT_CONFIG.topics['control' + key.charAt(0).toUpperCase() + key.slice(1)];
+                        if (topic) publishControl(topic, val ? 'ON' : 'OFF');
+                    }
+                    renderPumps();
+                    renderPhPanel();
+                    updatePumpCount();
+                });
+            });
+            
+            updatePumpCount();
+        }
+
+        function updatePumpCount() {
+            const active = Object.values(state.pumps).filter(Boolean).length;
+            DOM.activePumps.textContent = active;
+        }
+
+        function renderPhPanel() {
+            const ph = state.values.ph || 0;
+            const { min, max } = state.phTarget;
+            const inRange = ph >= min && ph <= max;
+            const manual = state.phMode === 'manual';
+            const upActive = state.pumps.phUp;
+            const downActive = state.pumps.phDown;
+            const f = state.fuzzy;
+            
+            const stateClass = inRange ? 'in-range' : ph < min ? 'low' : 'high';
+            const stateText = inRange ? 'Dalam rentang' : ph < min ? 'Terlalu asam' : 'Terlalu basa';
+            
+            DOM.phPanel.innerHTML = `
+                <div class="ph-left">
+                    <div class="ph-mode">
+                        <button class="${state.phMode === 'auto' ? 'active' : ''}" data-mode="auto">
+                            <i class="fa-solid fa-robot"></i> Auto
+                        </button>
+                        <button class="${manual ? 'active' : ''}" data-mode="manual">
+                            <i class="fa-solid fa-hand"></i> Manual
+                        </button>
+                    </div>
+                    <div class="ph-readout">
+                        <span class="val">${ph.toFixed(2)}</span>
+                        <span class="ph-state ${stateClass}">${stateText}</span>
+                    </div>
+                    <div class="ph-target-box">
+                        <label>Target pH</label>
+                        <div class="ph-target-row">
+                            <input type="number" id="phMin" step="0.1" min="5.5" max="7.0" value="${min.toFixed(1)}" />
+                            <span>s/d</span>
+                            <input type="number" id="phMax" step="0.1" min="5.5" max="7.0" value="${max.toFixed(1)}" />
+                        </div>
+                    </div>
+                </div>
+                <div class="ph-right">
+                    <div class="fuzzy-box">
+                        <h4>Fuzzy Strength: ${(f.strength * 100).toFixed(0)}%</h4>
+                        <div class="fuzzy-row">
+                            <span class="fuzzy-name">Koreksi</span>
+                            <span class="fuzzy-bar"><span class="fuzzy-fill" style="width:${(f.strength * 100).toFixed(0)}%"></span></span>
+                            <span class="fuzzy-pct">${(f.strength * 100).toFixed(0)}%</span>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button class="dose-btn ${upActive ? 'on' : ''}" data-dose="phUp" ${manual ? '' : 'disabled'}>
+                            <i class="fa-solid fa-arrow-up"></i> ${upActive ? 'Matikan' : 'pH Up'}
+                        </button>
+                        <button class="dose-btn ${downActive ? 'on' : ''}" data-dose="phDown" ${manual ? '' : 'disabled'}>
+                            <i class="fa-solid fa-arrow-down"></i> ${downActive ? 'Matikan' : 'pH Down'}
+                        </button>
+                    </div>
+                    <p class="ph-hint">${manual ? 'Mode Manual: kontrol pH manual.' : 'Mode Auto: sistem mengatur pH otomatis.'}</p>
+                </div>
+            `;
+            
+            // Events
+            DOM.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    state.phMode = btn.dataset.mode;
+                    if (state.phMode === 'manual') {
+                        state.pumps.phUp = false;
+                        state.pumps.phDown = false;
+                        publishControl(MQTT_CONFIG.topics.controlPhUp, 'OFF');
+                        publishControl(MQTT_CONFIG.topics.controlPhDown, 'OFF');
+                    }
+                    renderPhPanel();
+                    renderPumps();
+                });
+            });
+            
+            DOM.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const key = btn.dataset.dose;
+                    const next = !state.pumps[key];
+                    state.pumps.phUp = key === 'phUp' ? next : false;
+                    state.pumps.phDown = key === 'phDown' ? next : false;
+                    
+                    publishControl(MQTT_CONFIG.topics['control' + key.charAt(0).toUpperCase() + key.slice(1)], next ? 'ON' : 'OFF');
+                    renderPhPanel();
+                    renderPumps();
+                });
+            });
+            
+            const phMin = DOM.phPanel.querySelector('#phMin');
+            const phMax = DOM.phPanel.querySelector('#phMax');
+            if (phMin && phMax) {
+                [phMin, phMax].forEach(el => {
+                    el.addEventListener('change', () => {
+                        const mn = parseFloat(phMin.value) || 5.5;
+                        const mx = parseFloat(phMax.value) || 6.3;
+                        state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
+                        renderPhPanel();
+                    });
+                });
+            }
+        }
+
+        function updateStatusUI() {
+            const ph = state.values.ph || 0;
+            const inRange = ph >= state.phTarget.min && ph <= state.phTarget.max;
+            
+            let status = 'MENUNGGU';
+            let icon = 'fa-hourglass-half';
+            let cls = 'neutral';
+            let detail = 'Menunggu data...';
+            
+            if (state.hasReceivedData) {
+                if (inRange) {
+                    status = 'LAYAK';
+                    icon = 'fa-check-circle';
+                    cls = 'good';
+                    detail = 'Air dalam kondisi baik.';
+                } else if (ph < state.phTarget.min) {
+                    status = 'ASAM';
+                    icon = 'fa-circle-exclamation';
+                    cls = 'warning';
+                    detail = 'pH terlalu rendah!';
+                } else {
+                    status = 'BASA';
+                    icon = 'fa-circle-exclamation';
+                    cls = 'bad';
+                    detail = 'pH terlalu tinggi!';
+                }
+            }
+            
+            DOM.waterStatusText.textContent = status;
+            DOM.waterStatusText.className = cls + '-text';
+            DOM.statusDetail.textContent = detail;
+            DOM.statusIconWrapper.className = 'status-icon-wrapper ' + cls;
+            DOM.statusIconWrapper.innerHTML = '<i class="fa-solid ' + icon + '"></i>';
+            DOM.statusBadge.textContent = status;
+            DOM.statusBadge.className = 'badge ' + (cls === 'good' ? 'active' : cls === 'neutral' ? 'neutral' : 'inactive');
+        }
+
+        // ==================== CLOCK ====================
+        function tickClock() {
+            const now = new Date();
+            DOM.clock.textContent = now.toLocaleTimeString();
+            
+            if (state.broker === 'online') {
+                const s = Math.floor((Date.now() - state.startTime) / 1000);
+                DOM.uptime.textContent = 
+                    String(Math.floor(s / 3600)).padStart(2, '0') + ':' +
+                    String(Math.floor((s % 3600) / 60)).padStart(2, '0') + ':' +
+                    String(s % 60).padStart(2, '0');
+            }
+            DOM.pktCount.textContent = state.packets;
+        }
+
+        // ==================== TOAST ====================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            if (!container) {
+                const div = document.createElement('div');
+                div.id = 'toastContainer';
+                div.style.cssText = 'position:fixed;bottom:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px;';
+                document.body.appendChild(div);
+                return showToast(message, type);
+            }
+            
+            const colors = { success: '#10b981', error: '#ef4444', warning: '#f59e0b', info: '#3b82f6' };
+            const toast = document.createElement('div');
+            toast.style.cssText = `
+                padding: 10px 16px;
+                border-radius: 10px;
+                color: white;
+                background: ${colors[type] || '#6b7280'};
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                font-size: 0.85rem;
+                font-weight: 500;
+                animation: slideIn 0.3s ease;
+                max-width: 400px;
+                font-family: 'Outfit', sans-serif;
+            `;
+            toast.textContent = message;
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // ==================== RECONNECT ====================
+        DOM.reconnectBtn.addEventListener('click', () => {
+            if (state.broker === 'online') {
+                if (mqttClient) mqttClient.end();
+                state.broker = 'offline';
+                state.mqttConnected = false;
+                updateConnStatus();
+                showToast('🔌 Terputus', 'info');
+            } else {
+                state.reconnectAttempts = 0;
+                connectMQTT();
+            }
+        });
+
+        // ==================== INITIAL RENDER ====================
+        renderSensors();
+        renderPumps();
+        renderPhPanel();
+        updateConnStatus();
+        updateStatusUI();
+
+        console.log('✅ Dashboard ready!');
+        console.log('📡 Topics:', MQTT_CONFIG.topics);
+    </script>
+</body>
 </html>
