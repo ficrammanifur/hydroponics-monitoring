@@ -1,92 +1,151 @@
-Baik, saya perbaiki README.md dengan fokus pada **Fuzzy Logic** dan **diagram ASCII** yang lebih jelas. Saya gabungkan semua yang Anda minta:
+# 🌱 Hydroponic NFT Dashboard
+
+<p align="center">
+  <em>Smart Monitoring & Control System for NFT Hydroponic with ESP32, MQTT & Fuzzy Logic</em>
+</p>
+
+<p align="center">
+  <!-- Status Badges -->
+  <img src="https://img.shields.io/badge/status-active-brightgreen" alt="Status Active" />
+  <img src="https://img.shields.io/badge/last%20commit-today-brightgreen" alt="Last Commit" />
+  <img src="https://img.shields.io/badge/language-HTML%20%7C%20CSS%20%7C%20JavaScript-blue" alt="Language" />
+  <img src="https://img.shields.io/badge/platform-ESP32%20%7C%20Web-informational" alt="Platform" />
+  <img src="https://img.shields.io/badge/protocol-MQTT-green" alt="Protocol" />
+  <img src="https://img.shields.io/badge/controller-Fuzzy%20Logic-orange" alt="Fuzzy Logic" />
+  <img src="https://img.shields.io/badge/version-2.0.0-blue" alt="Version" />
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" />
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/🌱%20Hydroponic-NFT-green" alt="Hydroponic NFT" />
+  <img src="https://img.shields.io/badge/📡%20MQTT-HiveMQ-ff69b4" alt="MQTT HiveMQ" />
+  <img src="https://img.shields.io/badge/🧠%20Fuzzy-Logic-9cf" alt="Fuzzy Logic" />
+  <img src="https://img.shields.io/badge/🌿%20Plant-Presets-success" alt="Plant Presets" />
+</p>
 
 ---
 
-# Dashboard Monitoring Hidroponik NFT
+## 📑 Table of Contents
 
-Dashboard statis (HTML + CSS + JS) untuk memantau dan mengendalikan sistem hidroponik NFT berbasis ESP32. Menampilkan pembacaan sensor **TDS**, **suhu air**, dan **pH**, status koneksi **broker MQTT** & **ESP32**, kontrol pompa, serta **kendali pH otomatis berbasis logika fuzzy** dengan **Preset Tanaman**.
-
-> **Data real-time** dari ESP32 via MQTT over WebSocket (WSS). Dashboard terhubung ke broker HiveMQ public.
-
----
-
-## 📸 Tampilan Dashboard
-
-| Komponen | Deskripsi |
-|----------|-----------|
-| **Header** | Brand, status koneksi MQTT & ESP32, jam real-time |
-| **Conn Bar** | Host, port, client ID, uptime, packet count, tombol reconnect |
-| **Status Air** | Indikator kualitas air (LAYAK / ASAM / BASA) dengan ikon |
-| **Parameter Sensor** | pH, TDS, Suhu dengan badge status (Normal / Warn) |
-| **Kontrol Pompa** | 7 toggle switch untuk kontrol pompa (Aerator, Sirkulasi, Nutrisi, pH) |
-| **Kontrol pH & Preset Tanaman** | Dropdown preset tanaman, visual range pH, fuzzy strength, mode auto/manual |
-| **Data Telemetry** | Raw JSON dari ESP32 untuk debugging |
+- [✨ Overview](#-overview)
+- [🎯 Features](#-features)
+- [🏗️ System Architecture](#️-system-architecture)
+- [📁 Project Structure](#-project-structure)
+- [🔌 Pin Configuration](#-pin-configuration)
+- [📡 MQTT Topics](#-mqtt-topics)
+- [🧠 Fuzzy Logic Controller](#-fuzzy-logic-controller)
+- [🌱 Plant Presets](#-plant-presets)
+- [⚙️ Installation](#️-installation)
+- [🚀 Usage](#-usage)
+- [📱 Responsive Design](#-responsive-design)
+- [🐞 Troubleshooting](#-troubleshooting)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
 
 ---
 
-## 🌱 Fitur Preset Tanaman
+## ✨ Overview
 
-User dapat memilih jenis tanaman dari dropdown, dan sistem **otomatis mengatur target pH** sesuai kebutuhan optimal tanaman.
+**Hydroponic NFT Dashboard** adalah sistem monitoring dan kontrol untuk sistem hidroponik NFT (Nutrient Film Technique) berbasis ESP32. Dashboard ini menampilkan pembacaan sensor **TDS**, **suhu air**, dan **pH**, serta mengontrol 7 pompa secara real-time melalui MQTT.
 
-| Tanaman | pH Min | pH Max |
-|---------|--------|--------|
-| 🥬 Selada | 6.0 | 7.0 |
-| 🌿 Sawi | 5.5 | 6.5 |
-| 🌱 Kangkung | 5.5 | 6.5 |
-| 🍃 Bayam | 6.0 | 7.0 |
-| 🥦 Kailan | 5.5 | 6.5 |
-| 🥬 Pakcoy | 6.8 | 7.0 |
-| 🌿 Seledri | 6.3 | 6.7 |
-| 🌶️ Cabe | 6.0 | 6.5 |
-| 🌿 Peterseli | 5.5 | 6.0 |
-| 🍓 Strawberry | 5.8 | 6.2 |
-| 🥒 Ketimun | 5.3 | 5.7 |
-| 🎯 Manual | 5.8 | 6.3 |
+### 🎯 Cara Kerja
+
+1. **ESP32 membaca sensor** → pH, TDS, Suhu air
+2. **Data dikirim via MQTT** → ke broker HiveMQ
+3. **Dashboard menampilkan data** → real-time monitoring
+4. **User kontrol pompa** → via toggle switch di dashboard
+5. **Fuzzy Logic mengatur pH** → otomatis berdasarkan preset tanaman
+
+**Keunggulan:** Sistem otomatis menjaga pH sesuai kebutuhan tanaman dengan logika fuzzy yang halus (bukan on/off), menghindari overshoot.
 
 ---
 
-## 📁 Struktur Berkas
+## 🎯 Features
 
+- ✅ **Real-time Monitoring**  
+  pH, TDS, Suhu air dengan visual grafik dan badge status
+
+- ✅ **7 Pompa Kontrol**  
+  Aerator, Sirkulasi (2), pH Up, pH Down, Nutrisi A, Nutrisi B
+
+- ✅ **Fuzzy Logic pH Controller**  
+  5 membership functions, auto dosing dengan kekuatan 0-100%
+
+- ✅ **🌱 Plant Presets**  
+  12 preset tanaman dengan target pH otomatis
+
+- ✅ **MQTT Integration**  
+  Koneksi ke HiveMQ public broker dengan auto-reconnect
+
+- ✅ **Responsive Design**  
+  Optimized untuk desktop, tablet, dan mobile
+
+- ✅ **Dark Theme**  
+  Tampilan modern dengan aksen hijau
+
+---
+
+## 🏗️ System Architecture
+
+### 🔗 Diagram Sistem
+
+```text
+┌─────────────────┐    MQTT     ┌─────────────────┐    WiFi    ┌─────────────────┐
+│   Dashboard     │ ◄─────────► │   MQTT Broker   │ ◄────────► │      ESP32      │
+│   (index.html)  │             │  (HiveMQ/WSS)   │            │  (Hydroponic)   │
+└─────────────────┘             └─────────────────┘            └─────────────────┘
+         │                                                               │
+         │ Control                                                       │
+         ▼                                                               ▼
+┌─────────────────┐                                            ┌─────────────────┐
+│   User Input    │                                            │   Sensors       │
+│  (Toggle/Preset)│                                            │  pH / TDS / Temp│
+└─────────────────┘                                            └─────────────────┘
 ```
-.
-├── index.html      # Struktur halaman & tata letak (single file)
-└── README.md       # Dokumentasi ini
+
+### 📊 Message Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant D as Dashboard
+    participant M as MQTT Broker
+    participant E as ESP32
+    
+    U->>D: Pilih Preset Tanaman
+    D->>D: Set Target pH
+    D->>M: Publish preset
+    M->>E: Forward preset
+    E->>E: Update target pH
+    E->>M: Publish sensor data
+    M->>D: Update display
+    D->>U: Show real-time data
+    E->>E: Fuzzy Logic calculation
+    E->>M: Publish pump status
+    M->>D: Update pump status
+    D->>U: Show pump activity
 ```
 
-> **Catatan**: Kode lengkap ada di satu file `index.html` (HTML + CSS + JS inline). Buka langsung di browser atau jalankan static server (`npx serve .` atau `python -m http.server`).
+---
+
+## 📁 Project Structure
+
+```text
+hydroponics-monitoring/
+├── 📄 index.html          # Main dashboard (single file)
+├── 📖 README.md           # Documentation
+└── 📄 LICENSE             # MIT License
+```
+
+> **Catatan**: Kode lengkap ada di satu file `index.html` (HTML + CSS + JS inline).
 
 ---
 
-## 🔌 Spesifikasi Perangkat
+## 🔌 Pin Configuration
 
-| Item | Nilai |
-|------|-------|
-| Mikrokontroler | ESP32 / ESP32-S3 |
-| Broker MQTT | `broker.hivemq.com` (public) |
-| Port | `8884` (WSS / WebSocket Secure) |
-| Client ID | `dash_xxxxxxxx` (random generated) |
-| LCD | I2C `0x27`, 16x2 (SDA=21, SCL=22) |
-
-### Pemetaan Pin (GPIO)
-
-| Aktuator / Sensor | GPIO | Keterangan |
-|-------------------|------|------------|
-| **Relay 1** Aerator | 13 | Pompa udara |
-| **Relay 2** Sirkulasi 1 | 14 | Pompa sirkulasi utama |
-| **Relay 3** Sirkulasi 2 | 27 | Pompa sirkulasi cadangan |
-| **Relay 4** pH Up | 26 | Dosis KOH 10% |
-| **Relay 5** pH Down | 25 | Dosis asam (H₃PO₄) |
-| **Relay 6** Nutrisi A | 33 | Dosis nutrisi A |
-| **Relay 7** Nutrisi B | 32 | Dosis nutrisi B |
-| Sensor TDS | 35 | ADC1 Input Only (aman WiFi) |
-| Sensor pH | 34 | ADC1 Input Only (aman WiFi) |
-| Sensor Suhu DS18B20 | 4 | 1-Wire digital |
-| I2C SDA | 21 | LCD |
-| I2C SCL | 22 | LCD |
-
----
-
-## 📡 Diagram Rangkaian ESP32 (ASCII)
+### ESP32 GPIO Mapping
 
 ```
                         +-------------------------------+
@@ -128,9 +187,26 @@ User dapat memilih jenis tanaman dari dropdown, dan sistem **otomatis mengatur t
    - GPIO4 digunakan untuk sensor suhu DS18B20 (1-Wire)
 ```
 
+### Pin Table
+
+| Aktuator / Sensor | GPIO | Keterangan |
+|-------------------|------|------------|
+| **Relay 1** Aerator | 13 | Pompa udara |
+| **Relay 2** Sirkulasi 1 | 14 | Pompa sirkulasi utama |
+| **Relay 3** Sirkulasi 2 | 27 | Pompa sirkulasi cadangan |
+| **Relay 4** pH Up | 26 | Dosis KOH 10% |
+| **Relay 5** pH Down | 25 | Dosis asam (H₃PO₄) |
+| **Relay 6** Nutrisi A | 33 | Dosis nutrisi A |
+| **Relay 7** Nutrisi B | 32 | Dosis nutrisi B |
+| Sensor TDS | 35 | ADC1 Input Only |
+| Sensor pH | 34 | ADC1 Input Only |
+| Sensor Suhu DS18B20 | 4 | 1-Wire digital |
+| I2C SDA | 21 | LCD |
+| I2C SCL | 22 | LCD |
+
 ---
 
-## 📡 Skema Topik MQTT
+## 📡 MQTT Topics
 
 | Arah | Topik | Payload contoh |
 |------|-------|----------------|
@@ -140,13 +216,6 @@ User dapat memilih jenis tanaman dari dropdown, dan sistem **otomatis mengatur t
 | ESP32 → Dash | `hydroponic/riski/sensor/temp` | `24.6` |
 | ESP32 → Dash | `hydroponic/riski/sensor/all` | `{"ph":6.12,"tds":1180,...}` |
 | ESP32 → Dash | `hydroponic/riski/status/device` | `online` / `offline` |
-| ESP32 → Dash | `hydroponic/riski/status/aerator` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/sirkulasi1` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/sirkulasi2` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/phup` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/phdown` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/nutrisia` | `ON` / `OFF` |
-| ESP32 → Dash | `hydroponic/riski/status/nutrisib` | `ON` / `OFF` |
 | **Dashboard → ESP32** | | |
 | Dash → ESP32 | `hydroponic/riski/control/aerator` | `ON` / `OFF` |
 | Dash → ESP32 | `hydroponic/riski/control/sirkulasi1` | `ON` / `OFF` |
@@ -161,9 +230,11 @@ User dapat memilih jenis tanaman dari dropdown, dan sistem **otomatis mengatur t
 
 ---
 
-## 🧠 Metode Fuzzy — Kendali pH Otomatis
+## 🧠 Fuzzy Logic Controller
 
-Kendali pH memakai **Fuzzy Logic (model Sugeno orde-0)**. Prinsipnya: error pH tidak diperlakukan sebagai angka kaku, melainkan **dikelompokkan** ke dalam himpunan samar (fuzzy set) dengan derajat keanggotaan 0–1.
+### Overview
+
+Kendali pH memakai **Fuzzy Logic (model Sugeno orde-0)**. Error pH dikelompokkan ke dalam himpunan samar (fuzzy set) dengan derajat keanggotaan 0–1.
 
 ### 1. Variabel Masukan
 
@@ -175,9 +246,7 @@ pH_target_tengah = (pH_min + pH_max) / 2
 - `e < 0` → larutan terlalu **asam** → perlu **dinaikkan** (pH Up / KOH)
 - `e > 0` → larutan terlalu **basa** → perlu **diturunkan** (pH Down / asam)
 
-### 2. Himpunan Fuzzy (Fuzzifikasi / Pengelompokan)
-
-Lima kelompok dengan fungsi keanggotaan segitiga & bahu (shoulder):
+### 2. Himpunan Fuzzy
 
 ```
  μ
@@ -198,7 +267,7 @@ Lima kelompok dengan fungsi keanggotaan segitiga & bahu (shoulder):
 | Basa Lemah | Segitiga | (0.05, 0.3, 0.7) |
 | Basa Kuat | Bahu kanan | 0 di e ≤ 0.5, 1 di e ≥ 1.0 |
 
-### 3. Basis Aturan (Rule Base)
+### 3. Basis Aturan
 
 | No | JIKA pH termasuk | MAKA keluaran (out) | Arti |
 |----|------------------|---------------------|------|
@@ -208,25 +277,18 @@ Lima kelompok dengan fungsi keanggotaan segitiga & bahu (shoulder):
 | R4 | Basa Lemah | -0.5 | Turunkan pH lembut |
 | R5 | Basa Kuat | -1.0 | Turunkan pH kuat (pH Down) |
 
-### 4. Defuzzifikasi (Weighted Average)
+### 4. Defuzzifikasi
 
 ```
-            Σ ( μᵢ × outᵢ )
-crisp  =  ------------------          (rentang -1 … +1)
-              Σ μᵢ
+crisp = Σ(μᵢ × outᵢ) / Σ μᵢ    (rentang -1 … +1)
 ```
 
 Keputusan aktuator:
+- `crisp > 0.08` → pompa pH Up ON
+- `crisp < -0.08` → pompa pH Down ON
+- selain itu → kedua pompa OFF (deadband / zona aman)
 
-```
-crisp >  0.08   → pompa pH Up   ON   (dosis KOH)
-crisp < -0.08   → pompa pH Down ON   (dosis asam)
-selain itu      → kedua pompa OFF (zona aman / deadband)
-```
-
-Nilai `|crisp|` juga dipakai sebagai **kekuatan dosis** (0–100%): makin jauh dari target, makin besar laju perubahan pH per siklus.
-
-### 5. Pengujian & Pengelompokan (contoh, target pH 5.8–6.3 → tengah 6.05)
+### 5. Contoh Pengujian (target pH 5.8–6.3 → tengah 6.05)
 
 | pH terukur | e = pH-6.05 | Kelompok dominan | crisp | Aksi | Kekuatan |
 |------------|-------------|------------------|-------|------|----------|
@@ -235,140 +297,104 @@ Nilai `|crisp|` juga dipakai sebagai **kekuatan dosis** (0–100%): makin jauh d
 | 6.05 | 0.00 | Netral | 0.00 | Idle | 0% |
 | 6.55 | +0.50 | Basa Lemah | -0.50 | pH Down | 50% |
 | 7.20 | +1.15 | Basa Kuat | -1.00 | pH Down | 100% |
-| 6.10 | +0.05 | Netral∩BasaLemah | ~-0.03 | Idle (aman) | ~3% |
-
-**Kesimpulan pengujian:** sistem mengelompokkan kondisi larutan secara halus (bukan sekadar on/off), sehingga dosis mendekati target menjadi lembut dan menghindari *overshoot* — sesuai anjuran menambahkan KOH/asam **sedikit demi sedikit** hingga pH tercapai.
 
 ---
 
-## 🔄 Diagram Alur Sistem
+## 🌱 Plant Presets
 
-```mermaid
-flowchart TD
-    subgraph FIELD["Instalasi NFT"]
-        S1["Sensor TDS (GPIO 35)"]
-        S2["Sensor Suhu DS18B20 (GPIO 4)"]
-        S3["Sensor pH (GPIO 34)"]
-        ESP["ESP32\nBaca sensor + kendali pompa"]
-        P1["Pompa Aerator / Sirkulasi"]
-        P2["Pompa pH Up / pH Down"]
-        P3["Pompa Nutrisi A / B"]
-    end
+User dapat memilih jenis tanaman dari dropdown, dan sistem **otomatis mengatur target pH**.
 
-    subgraph CLOUD["Cloud"]
-        BR["Broker MQTT HiveMQ\nWSS :8884"]
-    end
-
-    subgraph UI["Dashboard (Browser)"]
-        DASH["index.html (single file)"]
-        FZ["Kendali pH Fuzzy"]
-        ST["Status Broker & ESP32"]
-        PR["Preset Tanaman"]
-    end
-
-    S1 --> ESP
-    S2 --> ESP
-    S3 --> ESP
-    ESP -- "publish hydroponic/riski/sensor/#" --> BR
-    BR -- "data sensor (WSS)" --> DASH
-    DASH --> FZ
-    DASH --> ST
-    DASH --> PR
-    FZ -- "keputusan dosis" --> DASH
-    DASH -- "publish hydroponic/riski/control/#" --> BR
-    BR -- "perintah pompa" --> ESP
-    ESP --> P1
-    ESP --> P2
-    ESP --> P3
-```
-
-### Alur Kendali pH
-
-```mermaid
-flowchart LR
-    A["Baca pH"] --> B{"Mode?"}
-    B -- "Manual" --> M["Ikuti tombol operator\n(pH Up / pH Down)"]
-    B -- "Auto" --> P["Ambil Preset Tanaman\n(target pH otomatis)"]
-    P --> F["Fuzzifikasi error\n(e = pH - target tengah)"]
-    F --> R["Evaluasi 5 aturan fuzzy"]
-    R --> D["Defuzzifikasi\n(weighted average)"]
-    D --> G{"crisp > 0.08?"}
-    G -- "ya" --> UP["Aktifkan pH Up (KOH)"]
-    G -- "crisp < -0.08" --> DOWN["Aktifkan pH Down (asam)"]
-    G -- "netral" --> IDLE["Kedua pompa mati"]
-    M --> OUT["Publish perintah pompa"]
-    UP --> OUT
-    DOWN --> OUT
-    IDLE --> OUT
-```
+| Tanaman | pH Min | pH Max |
+|---------|--------|--------|
+| 🥬 Selada | 6.0 | 7.0 |
+| 🌿 Sawi | 5.5 | 6.5 |
+| 🌱 Kangkung | 5.5 | 6.5 |
+| 🍃 Bayam | 6.0 | 7.0 |
+| 🥦 Kailan | 5.5 | 6.5 |
+| 🥬 Pakcoy | 6.8 | 7.0 |
+| 🌿 Seledri | 6.3 | 6.7 |
+| 🌶️ Cabe | 6.0 | 6.5 |
+| 🌿 Peterseli | 5.5 | 6.0 |
+| 🍓 Strawberry | 5.8 | 6.2 |
+| 🥒 Ketimun | 5.3 | 5.7 |
+| 🎯 Manual | 5.8 | 6.3 |
 
 ---
 
-## 🔌 Menyambungkan ke ESP32
+## ⚙️ Installation
 
-### ESP32 (.ino) - Topik yang digunakan:
+### 1. Clone Repository
+
+```bash
+git clone https://github.com/ficrammanifur/hydroponics-monitoring.git
+cd hydroponics-monitoring
+```
+
+### 2. Deploy Web Interface
+
+#### Option A: GitHub Pages
+
+1. Push ke repository GitHub
+2. Settings → Pages → Deploy from branch
+3. Select branch: main, folder: / (root)
+
+**Access URL:** `https://ficrammanifur.github.io/hydroponics-monitoring/`
+
+#### Option B: Local Development
+
+```bash
+# Python
+python -m http.server 8080
+
+# Node.js
+npx serve .
+
+# PHP
+php -S localhost:8080
+```
+
+**Access URL:** `http://localhost:8080`
+
+### 3. ESP32 Configuration
+
+Upload `esp32/filling_machine.ino` ke ESP32 dengan konfigurasi:
 
 ```cpp
-// Publikasi sensor (setiap 5 detik)
-client.publish("hydroponic/riski/sensor/ph", String(phValue).c_str());
-client.publish("hydroponic/riski/sensor/tds", String(tdsValue).c_str());
-client.publish("hydroponic/riski/sensor/temp", String(tempValue).c_str());
+// WiFi Configuration
+const char* WIFI_SSID = "Wokwi-GUEST";  // Untuk Wokwi
+const char* WIFI_PASSWORD = "";
 
-// JSON lengkap
-StaticJsonDocument<512> doc;
-doc["ph"] = phValue;
-doc["tds"] = tdsValue;
-doc["temperature"] = tempValue;
-doc["aerator"] = pumpState[0] ? "ON" : "OFF";
-// ... semua pompa
-serializeJson(doc, jsonBuffer);
-client.publish("hydroponic/riski/sensor/all", jsonBuffer);
-
-// Status device
-client.publish("hydroponic/riski/status/device", "online");
-
-// Subscribe kontrol
-client.subscribe("hydroponic/riski/control/#");
-client.subscribe("hydroponic/riski/status/request");
-```
-
-### Dashboard - Koneksi MQTT:
-
-```javascript
-const client = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
-    clientId: "dash_" + Math.random().toString(16).substr(2, 8),
-    clean: true,
-    reconnectPeriod: 3000,
-    keepAlive: 60,
-    connectTimeout: 15000
-});
-
-client.on("connect", () => {
-    client.subscribe("hydroponic/riski/#");
-    client.publish("hydroponic/riski/status/request", "STATUS");
-});
-
-client.on("message", (topic, payload) => {
-    // Handle data dari ESP32
-    handleMessage(topic, payload.toString());
-});
+// MQTT Configuration
+const char* MQTT_BROKER = "broker.hivemq.com";
+const int MQTT_PORT = 1883;
 ```
 
 ---
 
-## 🚀 Cara Menjalankan
+## 🚀 Usage
 
-1. **Clone atau download** file `index.html`
-2. **Buka langsung** di browser modern (Chrome, Firefox, Edge)
-3. Atau jalankan static server:
-   ```bash
-   npx serve .
-   # atau
-   python -m http.server 8080
+### Step-by-Step Operation
+
+1. **🌐 Open Dashboard**
    ```
-4. Buka `http://localhost:8080`
+   https://yourdomain.com/index.html
+   ```
 
-> **Pastikan ESP32 sudah terhubung ke broker HiveMQ** dan mempublikasikan data ke topik `hydroponic/riski/#`.
+2. **📊 Monitor Data**
+   - pH, TDS, Suhu ditampilkan real-time
+   - Status koneksi MQTT & ESP32
+
+3. **🌱 Pilih Preset Tanaman**
+   - Dropdown → pilih tanaman
+   - Target pH otomatis berubah
+
+4. **🎯 Kontrol Pompa**
+   - Toggle switch ON/OFF
+   - Status pompa real-time
+
+5. **🧠 Auto pH Control**
+   - Mode Auto → Fuzzy Logic aktif
+   - Sistem menjaga pH otomatis
 
 ---
 
@@ -381,20 +407,61 @@ Dashboard mendukung:
 
 ---
 
-## 📝 Catatan
+## 🐞 Troubleshooting
 
-- Dashboard menggunakan **WSS (WebSocket Secure)** untuk koneksi MQTT
-- Data ditampilkan **real-time** dari ESP32
-- **Fuzzy Logic** berjalan di sisi dashboard (bisa dipindah ke ESP32)
-- **Preset Tanaman** mengirim target pH ke ESP32 via MQTT
-- Semua kontrol pompa mengirim perintah **ON/OFF** ke ESP32
+### ❌ Common Issues
+
+#### **MQTT Connection Failed**
+```javascript
+// Check browser console
+console.log('MQTT status:', client.connected);
+
+// Try alternative brokers
+const BROKERS = [
+    'wss://broker.hivemq.com:8884/mqtt',
+    'wss://test.mosquitto.org:8081/mqtt',
+    'wss://broker.emqx.io:8084/mqtt'
+];
+```
+
+#### **ESP32 Tidak Online**
+- ✅ Periksa koneksi WiFi ESP32
+- ✅ Pastikan MQTT broker sama
+- ✅ Cek Serial Monitor
+
+#### **pH Tidak Stabil**
+- ✅ Kalibrasi sensor pH
+- ✅ Cek koneksi sensor
+- ✅ Periksa nilai target pH
 
 ---
 
-## 📄 Lisensi
+## 🤝 Contributing
+
+Kontribusi sangat diterima! Silakan:
+
+1. **Fork** repository
+2. **Create** feature branch
+3. **Commit** changes
+4. **Push** to branch
+5. **Open** Pull Request
+
+---
+
+## 📄 License
 
 MIT License - Gunakan secara bebas untuk keperluan edukasi dan pengembangan.
 
 ---
 
-**Dibuat dengan ❤️ untuk sistem hidroponik NFT** 🌱
+<div align="center">
+
+**⚡ Built with ESP32, MQTT & Fuzzy Logic**
+
+**🌱 Making hydroponics smarter and more automated**
+
+**⭐ Star this repo if you like it!**
+
+<p><a href="#top">⬆ Kembali ke Atas</a></p>
+
+</div>
