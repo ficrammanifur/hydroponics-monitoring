@@ -2,7 +2,6 @@
    HYDROPONIC NFT DASHBOARD - MQTT INTEGRATION v3.0
    DENGAN FUZZY LOGIC DI JAVASCRIPT (BUKAN ESP32)
    ========================================================================== */
-
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
     // HiveMQ Public Broker - WebSocket Secure (WSS)
