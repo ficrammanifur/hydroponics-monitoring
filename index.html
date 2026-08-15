@@ -548,7 +548,7 @@
         .target-row input:focus { outline: none; border-color: var(--primary); }
         .target-row span { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
 
-        /* Mode Buttons */
+        /* Mode Buttons - FIX: Lebih jelas */
         .mode-group {
             display: inline-flex;
             background: var(--bg-main);
@@ -903,7 +903,7 @@
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
             pumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
-            phMode: 'auto',
+            phMode: 'auto',  // Default auto
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
             broker: 'offline',
@@ -915,8 +915,11 @@
             connecting: false,
             attempts: 0,
             currentPreset: 'custom',
-            // FIX: Track mode dari ESP32
-            espMode: 'auto'
+            // FIX: Track mode dari ESP32 untuk sync
+            espMode: 'auto',
+            // FIX: Cegah spam publish
+            lastModeSent: '',
+            modeSendTime: 0
         };
 
         let client = null;
@@ -1072,7 +1075,7 @@
         }
 
         // ============================================================
-        // HANDLE MESSAGE
+        // HANDLE MESSAGE - FIX: Update UI dari ESP32
         // ============================================================
         function handleMessage(topic, payload) {
             state.packets++;
@@ -1086,14 +1089,23 @@
                 return;
             }
 
-            // FIX: Terima status mode dari ESP32 dan UPDATE state
+            // ★★★ FIX: Terima status mode dari ESP32 dan UPDATE UI ★★★
             if (topic === TOPICS.statusPhMode) {
                 state.espMode = payload;
                 state.phMode = payload; // Sinkronkan state dengan ESP32
                 console.log('📥 Mode dari ESP32:', state.phMode);
+                
+                // ★★★ FORCE RENDER ULANG ★★★
                 renderPhPanel();
                 renderPumps();
                 updateStatus();
+                
+                // Toast notifikasi
+                if (payload === 'manual') {
+                    toast('🔧 Mode MANUAL dari ESP32', 'warning');
+                } else {
+                    toast('🤖 Mode AUTO dari ESP32', 'success');
+                }
                 return;
             }
 
@@ -1120,11 +1132,15 @@
                     if (d.ph_target_max !== undefined) state.phTarget.max = parseFloat(d.ph_target_max);
                     if (d.fuzzy_strength !== undefined) state.fuzzy.strength = parseFloat(d.fuzzy_strength);
                     
-                    // FIX: Update mode dari JSON ESP32
+                    // ★★★ FIX: Update mode dari JSON ESP32 ★★★
                     if (d.ph_mode !== undefined) {
                         state.espMode = d.ph_mode;
                         state.phMode = d.ph_mode;
                         console.log('📥 Mode dari JSON:', state.phMode);
+                        // ★★★ FORCE RENDER ULANG ★★★
+                        renderPhPanel();
+                        renderPumps();
+                        updateStatus();
                     }
 
                     renderPumps();
@@ -1163,13 +1179,25 @@
         }
 
         // ============================================================
-        // PUBLISH
+        // PUBLISH - FIX: Cegah spam
         // ============================================================
         function publish(topic, value) {
             if (!client || !client.connected) {
                 toast('⚠️ MQTT tidak terhubung!', 'warning');
                 return false;
             }
+            
+            // ★★★ FIX: Cegah spam mode ★★★
+            if (topic === TOPICS.controlPhMode) {
+                const now = Date.now();
+                if (value === state.lastModeSent && (now - state.modeSendTime) < 2000) {
+                    console.log('⏳ Skip duplicate mode send:', value);
+                    return true;
+                }
+                state.lastModeSent = value;
+                state.modeSendTime = now;
+            }
+            
             try {
                 client.publish(topic, value, { qos: 1 });
                 console.log('📤', topic, '->', value);
@@ -1306,7 +1334,7 @@
                     const key = e.target.dataset.pump;
                     const val = e.target.checked;
                     
-                    // FIX: Hanya izinkan jika mode manual
+                    // ★★★ FIX: Hanya izinkan jika mode manual ★★★
                     if (state.phMode !== 'manual') {
                         toast('⚠️ Ganti ke mode manual dulu!', 'warning');
                         e.target.checked = state.pumps[key];
@@ -1334,7 +1362,7 @@
             const ph = state.values.ph || 0;
             const { min, max } = state.phTarget;
             const inRange = ph >= min && ph <= max;
-            // FIX: Gunakan state.phMode yang sudah sinkron dari ESP32
+            // ★★★ FIX: Gunakan state.phMode yang sudah sinkron ★★★
             const isManual = state.phMode === 'manual';
             const up = state.pumps.phUp;
             const down = state.pumps.phDown;
@@ -1355,10 +1383,20 @@
             const barL = ((min - rangeMin) / (rangeMax - rangeMin)) * 100;
             const barW = ((max - min) / (rangeMax - rangeMin)) * 100;
 
+            // ★★★ FIX: Mode label yang jelas ★★★
             const modeLabel = isManual ? '🔧 MANUAL' : '🤖 AUTO';
             const modeHint = isManual ? 
                 'Mode Manual: Anda dapat mengontrol pH Up/Down secara manual.' : 
                 'Mode Auto: Sistem mengatur pH otomatis berdasarkan preset tanaman.';
+            
+            // ★★★ FIX: Badge mode ★★★
+            const modeBadgeClass = isManual ? 'badge-sm active' : 'badge-sm active';
+            const modeBadgeColor = isManual ? 'var(--warning)' : 'var(--success)';
+            dom.presetBadge.textContent = isManual ? '🔧 Manual' : '🤖 Auto';
+            dom.presetBadge.className = modeBadgeClass;
+            dom.presetBadge.style.background = isManual ? 'var(--warning-bg)' : 'var(--success-bg)';
+            dom.presetBadge.style.color = modeBadgeColor;
+            dom.presetBadge.style.border = '1px solid ' + (isManual ? 'rgba(245,158,11,0.3)' : 'rgba(16,185,129,0.3)');
 
             dom.phPanel.innerHTML = `
                 <div class="left">
@@ -1405,7 +1443,7 @@
                 </div>
 
                 <div class="right">
-                    <!-- Mode Buttons -->
+                    <!-- ★★★ FIX: Mode Buttons dengan indikator jelas ★★★ -->
                     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <div class="mode-group">
                             <button class="${!isManual ? 'active' : ''}" data-mode="auto">
@@ -1415,7 +1453,7 @@
                                 <span class="mode-indicator"></span> Manual
                             </button>
                         </div>
-                        <span style="font-size:0.7rem;font-weight:600;color:${isManual ? 'var(--warning)' : 'var(--success)'};">
+                        <span style="font-size:0.7rem;font-weight:700;color:${isManual ? 'var(--warning)' : 'var(--success)'};background:${isManual ? 'var(--warning-bg)' : 'var(--success-bg)'};padding:0.2rem 0.6rem;border-radius:4px;">
                             ${modeLabel}
                         </span>
                     </div>
@@ -1470,8 +1508,6 @@
                     const key = e.target.value;
                     if (key === 'custom') {
                         state.currentPreset = 'custom';
-                        dom.presetBadge.textContent = '🎯 Manual';
-                        dom.presetBadge.className = 'badge-sm neutral';
                         toast('🎯 Mode manual', 'info');
                     } else {
                         applyPreset(key);
@@ -1480,26 +1516,27 @@
                 });
             }
 
-            // FIX: Mode buttons - kirim perintah ke ESP32
+            // ★★★ FIX: Mode buttons - kirim perintah ke ESP32 ★★★
             dom.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const mode = btn.dataset.mode;
                     console.log('🔄 Mode button clicked:', mode);
                     
-                    // Kirim ke ESP32
+                    // ★★★ Kirim ke ESP32 ★★★
                     publish(TOPICS.controlPhMode, mode);
                     
                     if (mode === 'manual') {
+                        // Matikan pH pumps
                         state.pumps.phUp = false;
                         state.pumps.phDown = false;
                         publish(TOPICS.controlPhUp, 'OFF');
                         publish(TOPICS.controlPhDown, 'OFF');
-                        toast('🔧 Mode Manual Aktif!', 'warning');
+                        toast('🔧 Mengirim perintah MANUAL...', 'warning');
                     } else {
-                        toast('🤖 Mode Auto Aktif!', 'success');
+                        toast('🤖 Mengirim perintah AUTO...', 'success');
                     }
                     
-                    // Jangan update state disini, tunggu balasan dari ESP32
+                    // ★★★ Jangan update state disini, tunggu balasan dari ESP32 ★★★
                     // ESP32 akan kirim status melalui TOPICS.statusPhMode
                 });
             });
@@ -1557,8 +1594,6 @@
                         const mx = parseFloat(maxEl.value) || 6.3;
                         state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
                         state.currentPreset = 'custom';
-                        dom.presetBadge.textContent = '🎯 Manual';
-                        dom.presetBadge.className = 'badge-sm neutral';
                         renderPhPanel();
                         updateStatus();
                     });
@@ -1625,6 +1660,7 @@
         console.log('✅ Dashboard ready!');
         console.log('🌱 Plant Presets:', PLANTS.map(p => p.name).join(', '));
         console.log('🔌 6 Relay:', PUMPS.map(p => p.name).join(', '));
+        console.log('🔄 Mode akan sync dari ESP32');
     </script>
 </body>
 </html>
