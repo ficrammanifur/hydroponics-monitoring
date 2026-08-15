@@ -564,7 +564,7 @@
         .target-row input:focus { outline: none; border-color: var(--primary); }
         .target-row span { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
 
-        /* Mode Buttons */
+        /* Mode Buttons - FIX: lebih jelas */
         .mode-group {
             display: inline-flex;
             background: var(--bg-main);
@@ -589,6 +589,20 @@
             background: var(--bg-card);
             color: var(--primary);
             box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .mode-group button .mode-indicator {
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            margin-right: 4px;
+        }
+        .mode-group button.active .mode-indicator {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(16,185,129,0.5);
+        }
+        .mode-group button:not(.active) .mode-indicator {
+            background: var(--text-muted);
         }
 
         /* Fuzzy */
@@ -859,7 +873,8 @@
             statusDashboard: 'hydroponic/riski/status/dashboard',
             statusRequest: 'hydroponic/riski/status/request',
             controlPhMode: 'hydroponic/riski/control/phmode',
-            controlPreset: 'hydroponic/riski/control/preset'
+            controlPreset: 'hydroponic/riski/control/preset',
+            statusPhMode: 'hydroponic/riski/status/phmode'
         };
 
         // ============================================================
@@ -884,9 +899,9 @@
         // SENSORS & PUMPS (6 Relay)
         // ============================================================
         const SENSORS = [
-            { key: 'ph', label: 'pH', unit: 'pH', dec: 2, icon: 'fa-vial' },
-            { key: 'tds', label: 'TDS', unit: 'ppm', dec: 0, icon: 'fa-water' },
-            { key: 'temp', label: 'Suhu', unit: '°C', dec: 1, icon: 'fa-temperature-half' }
+            { key: 'ph', label: 'pH', unit: 'pH', dec: 2, icon: 'fa-vial', idealMin: 5.5, idealMax: 7.0 },
+            { key: 'tds', label: 'TDS', unit: 'ppm', dec: 0, icon: 'fa-water', idealMin: 800, idealMax: 1400 },
+            { key: 'temp', label: 'Suhu', unit: '°C', dec: 1, icon: 'fa-temperature-half', idealMin: 18, idealMax: 28 }
         ];
 
         const PUMPS = [
@@ -904,7 +919,7 @@
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
             pumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
-            phMode: 'auto',
+            phMode: 'auto',  // 'auto' atau 'manual'
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
             broker: 'offline',
@@ -1020,7 +1035,8 @@
                         TOPICS.ph, TOPICS.tds, TOPICS.temp, TOPICS.all,
                         TOPICS.statusDevice, TOPICS.statusAerator, TOPICS.statusSirkulasi,
                         TOPICS.statusPhUp, TOPICS.statusPhDown,
-                        TOPICS.statusNutrisiA, TOPICS.statusNutrisiB
+                        TOPICS.statusNutrisiA, TOPICS.statusNutrisiB,
+                        TOPICS.statusPhMode
                     ];
                     subs.forEach(t => client.subscribe(t, { qos: 1 }));
                     client.subscribe('hydroponic/riski/#', { qos: 1 });
@@ -1085,6 +1101,15 @@
                 return;
             }
 
+            // FIX: Terima status mode dari ESP32
+            if (topic === TOPICS.statusPhMode) {
+                state.phMode = payload;
+                console.log('📥 Mode dari ESP32:', state.phMode);
+                renderPhPanel();
+                updateStatus();
+                return;
+            }
+
             if (topic === TOPICS.all) {
                 try {
                     const d = JSON.parse(payload);
@@ -1107,7 +1132,10 @@
                     if (d.ph_target_min !== undefined) state.phTarget.min = parseFloat(d.ph_target_min);
                     if (d.ph_target_max !== undefined) state.phTarget.max = parseFloat(d.ph_target_max);
                     if (d.fuzzy_strength !== undefined) state.fuzzy.strength = parseFloat(d.fuzzy_strength);
-                    if (d.ph_mode !== undefined) state.phMode = d.ph_mode;
+                    if (d.ph_mode !== undefined) {
+                        state.phMode = d.ph_mode;
+                        console.log('📥 Mode dari JSON:', state.phMode);
+                    }
 
                     renderPumps();
                     renderPhPanel();
@@ -1308,7 +1336,7 @@
             const ph = state.values.ph || 0;
             const { min, max } = state.phTarget;
             const inRange = ph >= min && ph <= max;
-            const manual = state.phMode === 'manual';
+            const isManual = state.phMode === 'manual';
             const up = state.pumps.phUp;
             const down = state.pumps.phDown;
             const f = state.fuzzy;
@@ -1327,6 +1355,12 @@
             const marker = ((ph - rangeMin) / (rangeMax - rangeMin)) * 100;
             const barL = ((min - rangeMin) / (rangeMax - rangeMin)) * 100;
             const barW = ((max - min) / (rangeMax - rangeMin)) * 100;
+
+            // FIX: Mode indicator yang jelas
+            const modeLabel = isManual ? '🔧 MANUAL' : '🤖 AUTO';
+            const modeHint = isManual ? 
+                'Mode Manual: Anda dapat mengontrol pH Up/Down secara manual.' : 
+                'Mode Auto: Sistem mengatur pH otomatis berdasarkan preset tanaman.';
 
             dom.phPanel.innerHTML = `
                 <div class="left">
@@ -1373,43 +1407,48 @@
                 </div>
 
                 <div class="right">
-                    <!-- Mode -->
-                    <div class="mode-group">
-                        <button class="${state.phMode === 'auto' ? 'active' : ''}" data-mode="auto">
-                            <i class="fa-solid fa-robot"></i> Auto
-                        </button>
-                        <button class="${manual ? 'active' : ''}" data-mode="manual">
-                            <i class="fa-solid fa-hand"></i> Manual
-                        </button>
+                    <!-- Mode Buttons - FIX: Jelas dan tidak auto kembali -->
+                    <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+                        <div class="mode-group">
+                            <button class="${!isManual ? 'active' : ''}" data-mode="auto">
+                                <span class="mode-indicator"></span> Auto
+                            </button>
+                            <button class="${isManual ? 'active' : ''}" data-mode="manual">
+                                <span class="mode-indicator"></span> Manual
+                            </button>
+                        </div>
+                        <span style="font-size:0.7rem;font-weight:600;color:${isManual ? 'var(--warning)' : 'var(--success)'};">
+                            ${modeLabel}
+                        </span>
                     </div>
 
-                    <!-- Fuzzy -->
-                    <div class="fuzzy-box">
-                        <div class="title">Fuzzy Strength: ${(f.strength * 100).toFixed(0)}%</div>
+                    <!-- Fuzzy - hanya tampil di mode auto -->
+                    <div class="fuzzy-box" style="${isManual ? 'opacity:0.5;' : ''}">
+                        <div class="title">Fuzzy Strength: ${(f.strength * 100).toFixed(0)}% ${isManual ? '(Nonaktif)' : ''}</div>
                         <div class="fuzzy-row">
                             <span class="label">Koreksi</span>
-                            <span class="bar"><span class="fill" style="width:${(f.strength * 100).toFixed(0)}%"></span></span>
-                            <span class="pct">${(f.strength * 100).toFixed(0)}%</span>
+                            <span class="bar"><span class="fill" style="width:${isManual ? 0 : (f.strength * 100).toFixed(0)}%"></span></span>
+                            <span class="pct">${isManual ? '0%' : (f.strength * 100).toFixed(0) + '%'}</span>
                         </div>
                     </div>
 
-                    <!-- Dose -->
+                    <!-- Dose Buttons - FIX: Enable/disable berdasarkan mode -->
                     <div class="dose-group">
-                        <button class="dose-btn ${up ? 'on' : ''}" data-dose="phUp" ${manual ? '' : 'disabled'}>
+                        <button class="dose-btn ${up ? 'on' : ''}" data-dose="phUp" ${isManual ? '' : 'disabled'}>
                             <i class="fa-solid fa-arrow-up"></i> ${up ? 'Matikan' : 'pH Up'}
                         </button>
-                        <button class="dose-btn ${down ? 'on' : ''}" data-dose="phDown" ${manual ? '' : 'disabled'}>
+                        <button class="dose-btn ${down ? 'on' : ''}" data-dose="phDown" ${isManual ? '' : 'disabled'}>
                             <i class="fa-solid fa-arrow-down"></i> ${down ? 'Matikan' : 'pH Down'}
                         </button>
                     </div>
 
-                    <p class="hint">
-                        ${manual ? '🔧 Mode Manual: kontrol pH manual.' : '🤖 Mode Auto: sistem mengatur pH otomatis berdasarkan preset tanaman.'}
-                    </p>
+                    <p class="hint">${modeHint}</p>
                 </div>
             `;
 
-            // Events
+            // ===== EVENTS =====
+
+            // Preset Select
             const sel = dom.phPanel.querySelector('#presetSelect');
             if (sel) {
                 sel.addEventListener('change', (e) => {
@@ -1426,35 +1465,59 @@
                 });
             }
 
+            // FIX: Mode buttons - kirim perintah ke ESP32
             dom.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    state.phMode = btn.dataset.mode;
-                    if (state.phMode === 'manual') {
+                    const mode = btn.dataset.mode;
+                    console.log('🔄 Mode button clicked:', mode);
+                    
+                    // Update state lokal dulu
+                    state.phMode = mode;
+                    
+                    // Kirim ke ESP32
+                    publish(TOPICS.controlPhMode, mode);
+                    
+                    // Jika pindah ke manual, matikan pH pumps
+                    if (mode === 'manual') {
                         state.pumps.phUp = false;
                         state.pumps.phDown = false;
                         publish(TOPICS.controlPhUp, 'OFF');
                         publish(TOPICS.controlPhDown, 'OFF');
+                        toast('🔧 Mode Manual Aktif!', 'warning');
                     } else {
-                        publish(TOPICS.controlPhMode, 'auto');
+                        toast('🤖 Mode Auto Aktif!', 'success');
                     }
+                    
                     renderPhPanel();
                     renderPumps();
+                    updateStatus();
                 });
             });
 
+            // Dose buttons (pH Up / pH Down)
             dom.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const key = btn.dataset.dose;
                     const next = !state.pumps[key];
+                    
+                    // Hanya bisa di mode manual
+                    if (state.phMode !== 'manual') {
+                        toast('⚠️ Ganti ke mode manual dulu!', 'warning');
+                        return;
+                    }
+                    
                     state.pumps.phUp = key === 'phUp' ? next : false;
                     state.pumps.phDown = key === 'phDown' ? next : false;
+                    
                     const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
                     publish(TOPICS[t], next ? 'ON' : 'OFF');
+                    
                     renderPhPanel();
                     renderPumps();
                 });
             });
 
+            // Manual target
             const minEl = dom.phPanel.querySelector('#phMin');
             const maxEl = dom.phPanel.querySelector('#phMax');
             if (minEl && maxEl) {
