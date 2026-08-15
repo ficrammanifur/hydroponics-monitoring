@@ -6,8 +6,9 @@
 
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
-    // HiveMQ Public Broker - WebSocket Secure
-    broker: 'wss://broker.hivemq.com:8084/mqtt',
+    // Gunakan broker alternatif atau HTTP
+    broker: 'ws://broker.hivemq.com:8000/mqtt',  // Port 8000 untuk WebSocket non-SSL
+    // broker: 'wss://broker.hivemq.com:8084/mqtt', // SSL (mungkin terblokir)
     
     topics: {
         // Sensor Topics (dari ESP32)
@@ -77,19 +78,12 @@ const SENSORS = [
 ];
 
 // ==================== KONFIGURASI POMPA ====================
-// UPDATE: Sesuai dengan pin terbaru
 const PUMPS = [
   { key: "aerator", name: "Aerator", pin: 13, group: "Aerasi", controlTopic: MQTT_CONFIG.topics.controlAerator, statusTopic: MQTT_CONFIG.topics.statusAerator },
   { key: "sirkulasi1", name: "Sirkulasi 1", pin: 14, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi1, statusTopic: MQTT_CONFIG.topics.statusSirkulasi1 },
   { key: "sirkulasi2", name: "Sirkulasi 2", pin: 27, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi2, statusTopic: MQTT_CONFIG.topics.statusSirkulasi2 },
   { key: "nutrisiA", name: "Nutrisi A", pin: 33, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiA, statusTopic: MQTT_CONFIG.topics.statusNutrisiA },
   { key: "nutrisiB", name: "Nutrisi B", pin: 32, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiB, statusTopic: MQTT_CONFIG.topics.statusNutrisiB },
-];
-
-// pH Pumps (terpisah karena kontrol khusus)
-const PH_PUMPS = [
-  { key: "phUp", name: "pH Up", pin: 26, controlTopic: MQTT_CONFIG.topics.controlPhUp, statusTopic: MQTT_CONFIG.topics.statusPhUp },
-  { key: "phDown", name: "pH Down", pin: 25, controlTopic: MQTT_CONFIG.topics.controlPhDown, statusTopic: MQTT_CONFIG.topics.statusPhDown }
 ];
 
 const PUMP_GROUP_ORDER = ["Aerasi", "Sirkulasi", "Dosis Nutrisi"];
@@ -132,7 +126,9 @@ const state = {
   clientId: '',
   hasReceivedData: false,
   lastSensorUpdate: 0,
-  isConnecting: false
+  isConnecting: false,
+  reconnectAttempts: 0,
+  maxReconnectAttempts: 10
 };
 
 // seed flat history
@@ -161,7 +157,11 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPhPanel();
     renderPumps();
     renderConnStatus();
-    connectMQTT();
+    
+    // Coba konek setelah 1 detik
+    setTimeout(() => {
+        connectMQTT();
+    }, 1000);
     
     setInterval(tickClock, 1000);
     tickClock();
@@ -185,7 +185,16 @@ function requestStatus() {
 
 // ==================== CONNECT MQTT ====================
 function connectMQTT() {
-    if (state.isConnecting) return;
+    if (state.isConnecting) {
+        console.log('⏳ Already connecting...');
+        return;
+    }
+    
+    if (state.reconnectAttempts >= state.maxReconnectAttempts) {
+        console.log('❌ Max reconnect attempts reached. Please refresh.');
+        showToast('❌ Gagal konek setelah ' + state.maxReconnectAttempts + ' percobaan. Refresh halaman.', 'error');
+        return;
+    }
     
     if (mqttClient && mqttClient.connected) {
         mqttClient.end();
@@ -195,6 +204,7 @@ function connectMQTT() {
     state.broker = "connecting";
     state.mqttConnected = false;
     state.isConnecting = true;
+    state.reconnectAttempts++;
     renderConnStatus();
     
     const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
@@ -205,9 +215,9 @@ function connectMQTT() {
     const options = {
         clientId: clientId,
         clean: true,
-        reconnectPeriod: 5000,
-        keepAlive: 60,
-        connectTimeout: 30000,
+        reconnectPeriod: 3000,
+        keepAlive: 30,
+        connectTimeout: 10000,
         will: {
             topic: MQTT_CONFIG.topics.statusDashboard,
             payload: 'offline',
@@ -216,7 +226,7 @@ function connectMQTT() {
         }
     };
     
-    console.log('🔄 Connecting to MQTT...');
+    console.log('🔄 Connecting to MQTT... (attempt ' + state.reconnectAttempts + ')');
     console.log('📡 Broker:', MQTT_CONFIG.broker);
     showToast('🔄 Menghubungkan ke MQTT...', 'info');
     
@@ -228,6 +238,7 @@ function connectMQTT() {
             state.broker = "online";
             state.mqttConnected = true;
             state.isConnecting = false;
+            state.reconnectAttempts = 0;
             state.startTime = Date.now();
             renderConnStatus();
             
@@ -284,6 +295,13 @@ function connectMQTT() {
             state.isConnecting = false;
             renderConnStatus();
             showToast('❌ MQTT Error: ' + err.message, 'error');
+            
+            // Coba reconnect setelah 5 detik
+            setTimeout(() => {
+                if (!state.mqttConnected) {
+                    connectMQTT();
+                }
+            }, 5000);
         });
         
         mqttClient.on('offline', () => {
@@ -306,6 +324,13 @@ function connectMQTT() {
             state.mqttConnected = false;
             state.isConnecting = false;
             renderConnStatus();
+            
+            // Coba reconnect setelah 3 detik
+            setTimeout(() => {
+                if (!state.mqttConnected) {
+                    connectMQTT();
+                }
+            }, 3000);
         });
         
     } catch (e) {
@@ -319,7 +344,7 @@ function connectMQTT() {
             if (!state.mqttConnected) {
                 connectMQTT();
             }
-        }, 10000);
+        }, 5000);
     }
 }
 
@@ -896,6 +921,7 @@ if (reconnectBtn) {
       renderConnStatus();
       showToast('🔌 Terputus dari MQTT', 'info');
     } else {
+      state.reconnectAttempts = 0;
       connectMQTT();
       showToast('🔄 Menghubungkan ke MQTT...', 'info');
     }
