@@ -145,7 +145,7 @@
         }
         .badge-sm.active { background: var(--success-bg); color: var(--success); border: 1px solid rgba(16,185,129,0.3); }
         .badge-sm.inactive { background: var(--danger-bg); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); }
-        .badge-sm.neutral { background: var(--neutral-bg); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.2); }
+        .badge-sm.neutral { background: var(--bg-main); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.2); }
 
         .clock {
             font-family: 'JetBrains Mono', monospace;
@@ -323,7 +323,7 @@
         .badge-param.neutral { background: var(--bg-main); color: var(--text-muted); }
 
         /* ============================================================
-           PUMPS
+           PUMPS (6 Relay)
            ============================================================ */
         .pump-grid {
             display: grid;
@@ -802,7 +802,7 @@
                 <div class="sensor-grid" id="sensorGrid"></div>
             </div>
 
-            <!-- PUMPS -->
+            <!-- PUMPS (6 Relay) -->
             <div class="card">
                 <div class="card-title"><i class="fa-solid fa-plug"></i> Kontrol Pompa <span style="margin-left:auto;font-size:0.6rem;font-weight:400;color:var(--text-muted);">(<span id="activePumps">0</span> aktif)</span></div>
                 <div class="pump-grid" id="pumpGrid"></div>
@@ -844,15 +844,13 @@
             temp: 'hydroponic/riski/sensor/temp',
             all: 'hydroponic/riski/sensor/all',
             controlAerator: 'hydroponic/riski/control/aerator',
-            controlSirkulasi1: 'hydroponic/riski/control/sirkulasi1',
-            controlSirkulasi2: 'hydroponic/riski/control/sirkulasi2',
+            controlSirkulasi: 'hydroponic/riski/control/sirkulasi',
             controlPhUp: 'hydroponic/riski/control/phup',
             controlPhDown: 'hydroponic/riski/control/phdown',
             controlNutrisiA: 'hydroponic/riski/control/nutrisia',
             controlNutrisiB: 'hydroponic/riski/control/nutrisib',
             statusAerator: 'hydroponic/riski/status/aerator',
-            statusSirkulasi1: 'hydroponic/riski/status/sirkulasi1',
-            statusSirkulasi2: 'hydroponic/riski/status/sirkulasi2',
+            statusSirkulasi: 'hydroponic/riski/status/sirkulasi',
             statusPhUp: 'hydroponic/riski/status/phup',
             statusPhDown: 'hydroponic/riski/status/phdown',
             statusNutrisiA: 'hydroponic/riski/status/nutrisia',
@@ -860,7 +858,8 @@
             statusDevice: 'hydroponic/riski/status/device',
             statusDashboard: 'hydroponic/riski/status/dashboard',
             statusRequest: 'hydroponic/riski/status/request',
-            controlPhMode: 'hydroponic/riski/control/phmode'
+            controlPhMode: 'hydroponic/riski/control/phmode',
+            controlPreset: 'hydroponic/riski/control/preset'
         };
 
         // ============================================================
@@ -882,7 +881,7 @@
         ];
 
         // ============================================================
-        // SENSORS & PUMPS
+        // SENSORS & PUMPS (6 Relay)
         // ============================================================
         const SENSORS = [
             { key: 'ph', label: 'pH', unit: 'pH', dec: 2, icon: 'fa-vial' },
@@ -892,15 +891,11 @@
 
         const PUMPS = [
             { key: 'aerator', name: 'Aerator', pin: 13, icon: 'fa-wind' },
-            { key: 'sirkulasi1', name: 'Sirkulasi 1', pin: 14, icon: 'fa-arrows-rotate' },
-            { key: 'sirkulasi2', name: 'Sirkulasi 2', pin: 27, icon: 'fa-arrows-rotate' },
+            { key: 'sirkulasi', name: 'Sirkulasi', pin: 14, icon: 'fa-arrows-rotate' },
+            { key: 'phUp', name: 'pH Up', pin: 26, icon: 'fa-arrow-up' },
+            { key: 'phDown', name: 'pH Down', pin: 25, icon: 'fa-arrow-down' },
             { key: 'nutrisiA', name: 'Nutrisi A', pin: 33, icon: 'fa-flask' },
             { key: 'nutrisiB', name: 'Nutrisi B', pin: 32, icon: 'fa-flask' }
-        ];
-
-        const PH_PUMPS = [
-            { key: 'phUp', name: 'pH Up', pin: 26, icon: 'fa-arrow-up' },
-            { key: 'phDown', name: 'pH Down', pin: 25, icon: 'fa-arrow-down' }
         ];
 
         // ============================================================
@@ -908,7 +903,7 @@
         // ============================================================
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
-            pumps: { aerator: false, sirkulasi1: false, sirkulasi2: false, nutrisiA: false, nutrisiB: false, phUp: false, phDown: false },
+            pumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
             phMode: 'auto',
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
@@ -957,6 +952,7 @@
         // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🌱 Hydroponic NFT Dashboard');
+            console.log('🔌 6 Relay: Aerator, Sirkulasi, pH Up, pH Down, Nutrisi A, Nutrisi B');
             renderSensors();
             renderPumps();
             renderPhPanel();
@@ -976,7 +972,8 @@
                 return;
             }
 
-            if (client && client.connected) { client.end(); client = null; }
+            if (client && client.connected) { client.end();
+                client = null; }
 
             state.broker = 'connecting';
             state.connecting = true;
@@ -1021,8 +1018,8 @@
 
                     const subs = [
                         TOPICS.ph, TOPICS.tds, TOPICS.temp, TOPICS.all,
-                        TOPICS.statusDevice, TOPICS.statusAerator, TOPICS.statusSirkulasi1,
-                        TOPICS.statusSirkulasi2, TOPICS.statusPhUp, TOPICS.statusPhDown,
+                        TOPICS.statusDevice, TOPICS.statusAerator, TOPICS.statusSirkulasi,
+                        TOPICS.statusPhUp, TOPICS.statusPhDown,
                         TOPICS.statusNutrisiA, TOPICS.statusNutrisiB
                     ];
                     subs.forEach(t => client.subscribe(t, { qos: 1 }));
@@ -1093,14 +1090,15 @@
                     const d = JSON.parse(payload);
                     dom.lastMessage.textContent = JSON.stringify(d, null, 2);
 
-                    if (d.ph !== undefined) { state.values.ph = parseFloat(d.ph); updateSensor('ph', state.values.ph); }
-                    if (d.tds !== undefined) { state.values.tds = parseFloat(d.tds); updateSensor('tds', state.values.tds); }
+                    if (d.ph !== undefined) { state.values.ph = parseFloat(d.ph);
+                        updateSensor('ph', state.values.ph); }
+                    if (d.tds !== undefined) { state.values.tds = parseFloat(d.tds);
+                        updateSensor('tds', state.values.tds); }
                     if (d.temperature !== undefined) { state.values.temp = parseFloat(d.temperature);
                         updateSensor('temp', state.values.temp); }
 
                     if (d.aerator !== undefined) state.pumps.aerator = d.aerator === 'ON';
-                    if (d.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = d.sirkulasi1 === 'ON';
-                    if (d.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = d.sirkulasi2 === 'ON';
+                    if (d.sirkulasi !== undefined) state.pumps.sirkulasi = d.sirkulasi === 'ON';
                     if (d.phup !== undefined) state.pumps.phUp = d.phup === 'ON';
                     if (d.phdown !== undefined) state.pumps.phDown = d.phdown === 'ON';
                     if (d.nutrisia !== undefined) state.pumps.nutrisiA = d.nutrisia === 'ON';
@@ -1133,8 +1131,7 @@
             // Pump status
             const pmap = {
                 [TOPICS.statusAerator]: 'aerator',
-                [TOPICS.statusSirkulasi1]: 'sirkulasi1',
-                [TOPICS.statusSirkulasi2]: 'sirkulasi2',
+                [TOPICS.statusSirkulasi]: 'sirkulasi',
                 [TOPICS.statusPhUp]: 'phUp',
                 [TOPICS.statusPhDown]: 'phDown',
                 [TOPICS.statusNutrisiA]: 'nutrisiA',
@@ -1179,7 +1176,7 @@
             dom.presetBadge.className = key === 'custom' ? 'badge-sm neutral' : 'badge-sm active';
 
             const msg = JSON.stringify({ phMin: p.phMin, phMax: p.phMax, preset: key });
-            publish('hydroponic/riski/control/preset', msg);
+            publish(TOPICS.controlPreset, msg);
             toast('🌱 Preset ' + p.name + ' (pH ' + p.phMin + '-' + p.phMax + ')', 'success');
             renderPhPanel();
             updateStatus();
@@ -1192,7 +1189,8 @@
         function updateStatus() {
             const online = state.broker === 'online';
             dom.brokerDot.className = 'dot ' + (online ? 'online' : state.broker === 'connecting' ? 'connecting' : 'offline');
-            dom.brokerStatus.textContent = online ? 'Terhubung' : state.broker === 'connecting' ? 'Menghubungkan...' : 'Terputus';
+            dom.brokerStatus.textContent = online ? 'Terhubung' : state.broker === 'connecting' ? 'Menghubungkan...' :
+                'Terputus';
 
             dom.mqttBadge.className = 'badge-sm ' + (online ? 'active' : 'inactive');
             dom.mqttBadge.textContent = 'MQTT';
@@ -1266,8 +1264,7 @@
         }
 
         function renderPumps() {
-            const all = [...PUMPS, ...PH_PUMPS];
-            dom.pumpGrid.innerHTML = all.map(p => {
+            dom.pumpGrid.innerHTML = PUMPS.map(p => {
                 const on = state.pumps[p.key] || false;
                 return `
                     <div class="pump-item">
@@ -1291,7 +1288,7 @@
                     const key = e.target.dataset.pump;
                     const val = e.target.checked;
                     state.pumps[key] = val;
-                    const pump = [...PUMPS, ...PH_PUMPS].find(p => p.key === key);
+                    const pump = PUMPS.find(p => p.key === key);
                     if (pump) {
                         const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
                         publish(TOPICS[t], val ? 'ON' : 'OFF');
@@ -1534,6 +1531,7 @@
         updateStatus();
         console.log('✅ Dashboard ready!');
         console.log('🌱 Plant Presets:', PLANTS.map(p => p.name).join(', '));
+        console.log('🔌 6 Relay:', PUMPS.map(p => p.name).join(', '));
     </script>
 </body>
 </html>
