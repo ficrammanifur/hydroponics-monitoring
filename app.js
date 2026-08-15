@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Hidroponik NFT Dashboard — MQTT Integration
+   Hydroponic NFT Dashboard — MQTT Integration
    Broker: broker.hivemq.com
    Topik: hydroponic/riski/#
    ========================================================================== */
@@ -7,21 +7,13 @@
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
     // HiveMQ Public Broker - WebSocket Secure (WSS)
-    // Port 8084 untuk WSS (SSL)
     broker: 'wss://broker.hivemq.com:8084/mqtt',
     
-    // Alternatif: Gunakan broker lain yang support WSS
-    // broker: 'wss://test.mosquitto.org:8081/mqtt',
-    // broker: 'wss://broker.emqx.io:8084/mqtt',
-    
     topics: {
-        // Sensor Topics (dari ESP32)
         ph: 'hydroponic/riski/sensor/ph',
         tds: 'hydroponic/riski/sensor/tds',
         temp: 'hydroponic/riski/sensor/temp',
         all: 'hydroponic/riski/sensor/all',
-        
-        // Control Topics (ke ESP32)
         controlAerator: 'hydroponic/riski/control/aerator',
         controlSirkulasi1: 'hydroponic/riski/control/sirkulasi1',
         controlSirkulasi2: 'hydroponic/riski/control/sirkulasi2',
@@ -29,8 +21,6 @@ const MQTT_CONFIG = {
         controlPhDown: 'hydroponic/riski/control/phdown',
         controlNutrisiA: 'hydroponic/riski/control/nutrisia',
         controlNutrisiB: 'hydroponic/riski/control/nutrisib',
-        
-        // Status Topics (dari ESP32)
         statusAerator: 'hydroponic/riski/status/aerator',
         statusSirkulasi1: 'hydroponic/riski/status/sirkulasi1',
         statusSirkulasi2: 'hydroponic/riski/status/sirkulasi2',
@@ -132,8 +122,7 @@ const state = {
   lastSensorUpdate: 0,
   isConnecting: false,
   reconnectAttempts: 0,
-  maxReconnectAttempts: 10,
-  usingFallback: false
+  maxReconnectAttempts: 10
 };
 
 // seed flat history
@@ -163,7 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPumps();
     renderConnStatus();
     
-    // Coba konek setelah 1 detik
     setTimeout(() => {
         connectMQTT();
     }, 1000);
@@ -171,7 +159,6 @@ document.addEventListener('DOMContentLoaded', () => {
     setInterval(tickClock, 1000);
     tickClock();
     
-    // Auto-refresh sensor setiap 30s jika tidak ada data
     setInterval(() => {
         if (!state.hasReceivedData && state.broker === 'online') {
             requestStatus();
@@ -196,8 +183,8 @@ function connectMQTT() {
     }
     
     if (state.reconnectAttempts >= state.maxReconnectAttempts) {
-        console.log('❌ Max reconnect attempts reached. Please refresh.');
-        showToast('❌ Gagal konek setelah ' + state.maxReconnectAttempts + ' percobaan. Refresh halaman.', 'error');
+        console.log('❌ Max reconnect attempts reached.');
+        showToast('❌ Gagal konek. Refresh halaman.', 'error');
         return;
     }
     
@@ -217,23 +204,14 @@ function connectMQTT() {
     const clientIdEl = document.getElementById('clientId');
     if (clientIdEl) clientIdEl.textContent = clientId;
     
-    // Gunakan WSS (WebSocket Secure)
-    let brokerUrl = MQTT_CONFIG.broker;
-    
-    // Fallback ke broker lain jika perlu
-    if (state.reconnectAttempts > 3 && !state.usingFallback) {
-        state.usingFallback = true;
-        brokerUrl = 'wss://test.mosquitto.org:8081/mqtt';
-        console.log('🔄 Switching to fallback broker:', brokerUrl);
-        showToast('🔄 Mencoba broker alternatif...', 'info');
-    }
+    const brokerUrl = MQTT_CONFIG.broker;
     
     const options = {
         clientId: clientId,
         clean: true,
-        reconnectPeriod: 3000,
-        keepAlive: 30,
-        connectTimeout: 10000,
+        reconnectPeriod: 5000,
+        keepAlive: 60,
+        connectTimeout: 30000,
         will: {
             topic: MQTT_CONFIG.topics.statusDashboard,
             payload: 'offline',
@@ -250,7 +228,7 @@ function connectMQTT() {
         mqttClient = mqtt.connect(brokerUrl, options);
         
         mqttClient.on('connect', () => {
-            console.log('✅ MQTT Connected to', brokerUrl);
+            console.log('✅ MQTT Connected to HiveMQ');
             state.broker = "online";
             state.mqttConnected = true;
             state.isConnecting = false;
@@ -260,7 +238,6 @@ function connectMQTT() {
             
             showToast('✅ MQTT Terhubung!', 'success');
             
-            // Subscribe ke semua topik
             const topics = [
                 MQTT_CONFIG.topics.ph,
                 MQTT_CONFIG.topics.tds,
@@ -280,19 +257,13 @@ function connectMQTT() {
                 mqttClient.subscribe(topic, { qos: 1 }, (err) => {
                     if (!err) {
                         console.log('✅ Subscribed to:', topic);
-                    } else {
-                        console.error('❌ Subscribe error:', topic, err);
                     }
                 });
             });
             
-            // Subscribe ke wildcard
             mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
-            
-            // Publish status online
             mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1, retain: false });
             
-            // Request status dari ESP32
             setTimeout(() => {
                 requestStatus();
             }, 1000);
@@ -368,7 +339,6 @@ function handleMQTTMessage(topic, payload) {
     state.packets++;
     state.hasReceivedData = true;
     
-    // Update status ESP
     if (topic === MQTT_CONFIG.topics.statusDevice) {
         state.esp = payload === 'online' ? 'active' : 'inactive';
         renderConnStatus();
@@ -378,7 +348,6 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    // Parse sensor data dari JSON
     if (topic === MQTT_CONFIG.topics.all) {
         try {
             const data = JSON.parse(payload);
@@ -400,7 +369,6 @@ function handleMQTTMessage(topic, payload) {
                 hasUpdate = true;
             }
             
-            // Update pump status from JSON
             if (data.aerator !== undefined) state.pumps.aerator = data.aerator === 'ON';
             if (data.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = data.sirkulasi1 === 'ON';
             if (data.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = data.sirkulasi2 === 'ON';
@@ -415,7 +383,6 @@ function handleMQTTMessage(topic, payload) {
                 renderPhPanel();
                 renderPumps();
                 updateFuzzyLogic();
-                console.log('📊 Data updated:', state.values);
             }
             
         } catch (e) {
@@ -424,7 +391,6 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    // Individual sensor topics
     if (topic === MQTT_CONFIG.topics.ph) {
         const val = parseFloat(payload);
         if (!isNaN(val)) {
@@ -460,7 +426,6 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    // Pump status
     const pumpMap = {
         'hydroponic/riski/status/aerator': 'aerator',
         'hydroponic/riski/status/sirkulasi1': 'sirkulasi1',
@@ -472,8 +437,7 @@ function handleMQTTMessage(topic, payload) {
     };
     
     if (pumpMap[topic]) {
-        const newState = payload === 'ON';
-        state.pumps[pumpMap[topic]] = newState;
+        state.pumps[pumpMap[topic]] = payload === 'ON';
         renderPumps();
         renderPhPanel();
         return;
@@ -752,7 +716,6 @@ function renderPhPanel() {
       }</p>
     </div>`;
 
-  // wire events
   panel.querySelectorAll("[data-mode]").forEach((btn) =>
     btn.addEventListener("click", () => setPhMode(btn.dataset.mode))
   );
@@ -936,7 +899,6 @@ if (reconnectBtn) {
       showToast('🔌 Terputus dari MQTT', 'info');
     } else {
       state.reconnectAttempts = 0;
-      state.usingFallback = false;
       connectMQTT();
       showToast('🔄 Menghubungkan ke MQTT...', 'info');
     }
