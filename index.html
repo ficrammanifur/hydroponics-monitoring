@@ -564,7 +564,7 @@
         .target-row input:focus { outline: none; border-color: var(--primary); }
         .target-row span { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; }
 
-        /* Mode Buttons - FIX: lebih jelas */
+        /* Mode Buttons */
         .mode-group {
             display: inline-flex;
             background: var(--bg-main);
@@ -919,7 +919,7 @@
         const state = {
             values: { ph: 0, tds: 0, temp: 0 },
             pumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
-            phMode: 'auto',  // 'auto' atau 'manual'
+            phMode: 'auto',
             phTarget: { min: 5.8, max: 6.3 },
             fuzzy: { strength: 0 },
             broker: 'offline',
@@ -930,7 +930,10 @@
             hasData: false,
             connecting: false,
             attempts: 0,
-            currentPreset: 'custom'
+            currentPreset: 'custom',
+            // FIX: Track status relay dari ESP32
+            espPumps: { aerator: false, sirkulasi: false, phUp: false, phDown: false, nutrisiA: false, nutrisiB: false },
+            forceOff: false
         };
 
         let client = null;
@@ -1122,12 +1125,21 @@
                     if (d.temperature !== undefined) { state.values.temp = parseFloat(d.temperature);
                         updateSensor('temp', state.values.temp); }
 
-                    if (d.aerator !== undefined) state.pumps.aerator = d.aerator === 'ON';
-                    if (d.sirkulasi !== undefined) state.pumps.sirkulasi = d.sirkulasi === 'ON';
-                    if (d.phup !== undefined) state.pumps.phUp = d.phup === 'ON';
-                    if (d.phdown !== undefined) state.pumps.phDown = d.phdown === 'ON';
-                    if (d.nutrisia !== undefined) state.pumps.nutrisiA = d.nutrisia === 'ON';
-                    if (d.nutrisib !== undefined) state.pumps.nutrisiB = d.nutrisib === 'ON';
+                    // FIX: Update status relay dari ESP32 (untuk tracking)
+                    if (d.aerator !== undefined) state.espPumps.aerator = d.aerator === 'ON';
+                    if (d.sirkulasi !== undefined) state.espPumps.sirkulasi = d.sirkulasi === 'ON';
+                    if (d.phup !== undefined) state.espPumps.phUp = d.phup === 'ON';
+                    if (d.phdown !== undefined) state.espPumps.phDown = d.phdown === 'ON';
+                    if (d.nutrisia !== undefined) state.espPumps.nutrisiA = d.nutrisia === 'ON';
+                    if (d.nutrisib !== undefined) state.espPumps.nutrisiB = d.nutrisib === 'ON';
+
+                    // Update state pumps dengan data dari ESP32
+                    state.pumps.aerator = state.espPumps.aerator;
+                    state.pumps.sirkulasi = state.espPumps.sirkulasi;
+                    state.pumps.phUp = state.espPumps.phUp;
+                    state.pumps.phDown = state.espPumps.phDown;
+                    state.pumps.nutrisiA = state.espPumps.nutrisiA;
+                    state.pumps.nutrisiB = state.espPumps.nutrisiB;
 
                     if (d.ph_target_min !== undefined) state.phTarget.min = parseFloat(d.ph_target_min);
                     if (d.ph_target_max !== undefined) state.phTarget.max = parseFloat(d.ph_target_max);
@@ -1156,7 +1168,7 @@
                 return;
             }
 
-            // Pump status
+            // FIX: Pump status dari ESP32
             const pmap = {
                 [TOPICS.statusAerator]: 'aerator',
                 [TOPICS.statusSirkulasi]: 'sirkulasi',
@@ -1166,7 +1178,9 @@
                 [TOPICS.statusNutrisiB]: 'nutrisiB'
             };
             if (pmap[topic]) {
-                state.pumps[pmap[topic]] = payload === 'ON';
+                const val = payload === 'ON';
+                state.espPumps[pmap[topic]] = val;
+                state.pumps[pmap[topic]] = val;
                 renderPumps();
                 renderPhPanel();
             }
@@ -1315,12 +1329,23 @@
                 el.addEventListener('change', (e) => {
                     const key = e.target.dataset.pump;
                     const val = e.target.checked;
-                    state.pumps[key] = val;
-                    const pump = PUMPS.find(p => p.key === key);
-                    if (pump) {
-                        const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
-                        publish(TOPICS[t], val ? 'ON' : 'OFF');
+                    
+                    // FIX: Jika mode manual, kirim perintah
+                    if (state.phMode === 'manual') {
+                        state.pumps[key] = val;
+                        const pump = PUMPS.find(p => p.key === key);
+                        if (pump) {
+                            const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                            publish(TOPICS[t], val ? 'ON' : 'OFF');
+                        }
+                    } else {
+                        // FIX: Jika mode auto, tolak perubahan
+                        toast('⚠️ Ganti ke mode manual dulu!', 'warning');
+                        // Kembalikan checkbox ke state semula
+                        e.target.checked = state.pumps[key];
+                        return;
                     }
+                    
                     renderPumps();
                     renderPhPanel();
                     const active = Object.values(state.pumps).filter(Boolean).length;
@@ -1356,7 +1381,6 @@
             const barL = ((min - rangeMin) / (rangeMax - rangeMin)) * 100;
             const barW = ((max - min) / (rangeMax - rangeMin)) * 100;
 
-            // FIX: Mode indicator yang jelas
             const modeLabel = isManual ? '🔧 MANUAL' : '🤖 AUTO';
             const modeHint = isManual ? 
                 'Mode Manual: Anda dapat mengontrol pH Up/Down secara manual.' : 
@@ -1407,7 +1431,7 @@
                 </div>
 
                 <div class="right">
-                    <!-- Mode Buttons - FIX: Jelas dan tidak auto kembali -->
+                    <!-- Mode Buttons -->
                     <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
                         <div class="mode-group">
                             <button class="${!isManual ? 'active' : ''}" data-mode="auto">
@@ -1422,7 +1446,7 @@
                         </span>
                     </div>
 
-                    <!-- Fuzzy - hanya tampil di mode auto -->
+                    <!-- Fuzzy -->
                     <div class="fuzzy-box" style="${isManual ? 'opacity:0.5;' : ''}">
                         <div class="title">Fuzzy Strength: ${(f.strength * 100).toFixed(0)}% ${isManual ? '(Nonaktif)' : ''}</div>
                         <div class="fuzzy-row">
@@ -1432,7 +1456,7 @@
                         </div>
                     </div>
 
-                    <!-- Dose Buttons - FIX: Enable/disable berdasarkan mode -->
+                    <!-- FIX: Dose Buttons - Hanya aktif di mode manual -->
                     <div class="dose-group">
                         <button class="dose-btn ${up ? 'on' : ''}" data-dose="phUp" ${isManual ? '' : 'disabled'}>
                             <i class="fa-solid fa-arrow-up"></i> ${up ? 'Matikan' : 'pH Up'}
@@ -1441,6 +1465,23 @@
                             <i class="fa-solid fa-arrow-down"></i> ${down ? 'Matikan' : 'pH Down'}
                         </button>
                     </div>
+
+                    <!-- FIX: Tombol Matikan Semua Relay (Emergency) -->
+                    <button id="emergencyOffBtn" style="
+                        width:100%;
+                        padding:0.4rem;
+                        border-radius:8px;
+                        border:1px solid var(--danger);
+                        background:var(--danger-bg);
+                        color:var(--danger);
+                        font-family:'Outfit',sans-serif;
+                        font-size:0.7rem;
+                        font-weight:700;
+                        cursor:pointer;
+                        transition:all 0.2s;
+                    ">
+                        🛑 MATIKAN SEMUA RELAY
+                    </button>
 
                     <p class="hint">${modeHint}</p>
                 </div>
@@ -1465,19 +1506,15 @@
                 });
             }
 
-            // FIX: Mode buttons - kirim perintah ke ESP32
+            // Mode buttons
             dom.phPanel.querySelectorAll('[data-mode]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const mode = btn.dataset.mode;
                     console.log('🔄 Mode button clicked:', mode);
                     
-                    // Update state lokal dulu
                     state.phMode = mode;
-                    
-                    // Kirim ke ESP32
                     publish(TOPICS.controlPhMode, mode);
                     
-                    // Jika pindah ke manual, matikan pH pumps
                     if (mode === 'manual') {
                         state.pumps.phUp = false;
                         state.pumps.phDown = false;
@@ -1498,14 +1535,14 @@
             dom.phPanel.querySelectorAll('[data-dose]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const key = btn.dataset.dose;
-                    const next = !state.pumps[key];
                     
-                    // Hanya bisa di mode manual
+                    // FIX: Hanya bisa di mode manual
                     if (state.phMode !== 'manual') {
                         toast('⚠️ Ganti ke mode manual dulu!', 'warning');
                         return;
                     }
                     
+                    const next = !state.pumps[key];
                     state.pumps.phUp = key === 'phUp' ? next : false;
                     state.pumps.phDown = key === 'phDown' ? next : false;
                     
@@ -1516,6 +1553,32 @@
                     renderPumps();
                 });
             });
+
+            // FIX: Emergency Off - Matikan Semua Relay
+            const emergencyBtn = dom.phPanel.querySelector('#emergencyOffBtn');
+            if (emergencyBtn) {
+                emergencyBtn.addEventListener('click', () => {
+                    if (confirm('⚠️ Yakin ingin mematikan SEMUA relay?')) {
+                        console.log('🛑 EMERGENCY OFF - Matikan semua relay');
+                        
+                        // Matikan semua pump di state
+                        Object.keys(state.pumps).forEach(key => {
+                            state.pumps[key] = false;
+                        });
+                        
+                        // Kirim perintah OFF ke semua relay
+                        const allPumps = ['aerator', 'sirkulasi', 'phUp', 'phDown', 'nutrisiA', 'nutrisiB'];
+                        allPumps.forEach(key => {
+                            const t = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                            publish(TOPICS[t], 'OFF');
+                        });
+                        
+                        toast('🛑 SEMUA RELAY DI MATIKAN!', 'error');
+                        renderPumps();
+                        renderPhPanel();
+                    }
+                });
+            }
 
             // Manual target
             const minEl = dom.phPanel.querySelector('#phMin');
@@ -1595,6 +1658,7 @@
         console.log('✅ Dashboard ready!');
         console.log('🌱 Plant Presets:', PLANTS.map(p => p.name).join(', '));
         console.log('🔌 6 Relay:', PUMPS.map(p => p.name).join(', '));
+        console.log('🛑 Emergency Off button available!');
     </script>
 </body>
 </html>
