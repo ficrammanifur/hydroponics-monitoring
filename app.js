@@ -2,19 +2,17 @@
    HYDROPONIC NFT DASHBOARD - MQTT INTEGRATION v3.0
    DENGAN FUZZY LOGIC DI JAVASCRIPT (BUKAN ESP32)
    ========================================================================== */
+
 // ==================== MQTT CONFIGURATION ====================
 const MQTT_CONFIG = {
-    // HiveMQ Public Broker - WebSocket Secure (WSS)
     broker: 'wss://broker.hivemq.com:8884/mqtt',
     
     topics: {
-        // Sensor Topics (dari ESP32)
         ph: 'hydroponic/riski/sensor/ph',
         tds: 'hydroponic/riski/sensor/tds',
         temp: 'hydroponic/riski/sensor/temp',
         all: 'hydroponic/riski/sensor/all',
         
-        // Control Topics (ke ESP32)
         controlAerator: 'hydroponic/riski/control/aerator',
         controlSirkulasi: 'hydroponic/riski/control/sirkulasi',
         controlPhUp: 'hydroponic/riski/control/phup',
@@ -22,7 +20,6 @@ const MQTT_CONFIG = {
         controlNutrisiA: 'hydroponic/riski/control/nutrisia',
         controlNutrisiB: 'hydroponic/riski/control/nutrisib',
         
-        // Status Topics (dari ESP32)
         statusAerator: 'hydroponic/riski/status/aerator',
         statusSirkulasi: 'hydroponic/riski/status/sirkulasi',
         statusPhUp: 'hydroponic/riski/status/phup',
@@ -82,7 +79,6 @@ const PUMPS = [
   { key: "nutrisiB", name: "Nutrisi B", pin: 32, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiB, statusTopic: MQTT_CONFIG.topics.statusNutrisiB },
 ];
 
-// pH Pumps (terpisah karena kontrol khusus)
 const PH_PUMPS = [
   { key: "phUp", name: "pH Up", pin: 26, controlTopic: MQTT_CONFIG.topics.controlPhUp, statusTopic: MQTT_CONFIG.topics.statusPhUp },
   { key: "phDown", name: "pH Down", pin: 25, controlTopic: MQTT_CONFIG.topics.controlPhDown, statusTopic: MQTT_CONFIG.topics.statusPhDown }
@@ -128,22 +124,15 @@ const state = {
   mqttConnected: false,
   clientId: '',
   hasReceivedData: false,
-  // ★★★ Fuzzy timer untuk JavaScript ★★★
-  lastFuzzyRun: 0,
-  fuzzyInterval: 3000,
-  // ★★★ Cegah spam publish ★★★
   lastModeSent: '',
   modeSendTime: 0
 };
 
-// seed flat history
 SENSORS.forEach((s) => {
   state.history[s.key] = Array.from({ length: HISTORY_LEN }, () => 0);
 });
 
-// ==================== MQTT CLIENT ====================
 let mqttClient = null;
-let reconnectTimer = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_ATTEMPTS = 10;
 
@@ -205,10 +194,8 @@ function connectMQTT() {
             state.startTime = Date.now();
             reconnectAttempts = 0;
             renderConnStatus();
-            
             showToast('✅ MQTT Connected!', 'success');
             
-            // Subscribe ke semua topik
             const topics = [
                 MQTT_CONFIG.topics.ph,
                 MQTT_CONFIG.topics.tds,
@@ -225,21 +212,14 @@ function connectMQTT() {
             
             topics.forEach(topic => {
                 mqttClient.subscribe(topic, { qos: 1 }, (err) => {
-                    if (!err) {
-                        console.log('✅ Subscribed to:', topic);
-                    } else {
-                        console.error('❌ Subscribe error:', topic, err);
-                    }
+                    if (!err) console.log('✅ Subscribed to:', topic);
+                    else console.error('❌ Subscribe error:', topic, err);
                 });
             });
             
-            // Subscribe ke wildcard untuk semua topik hydroponic/riski/
             mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
-            
-            // Publish status online
             mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1, retain: false });
             
-            // Request status dari ESP32
             setTimeout(() => {
                 if (mqttClient && mqttClient.connected) {
                     mqttClient.publish(MQTT_CONFIG.topics.statusRequest, 'STATUS');
@@ -265,9 +245,7 @@ function connectMQTT() {
             if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 const delay = Math.min(30000, 5000 * reconnectAttempts);
                 setTimeout(() => {
-                    if (!state.mqttConnected) {
-                        connectMQTT();
-                    }
+                    if (!state.mqttConnected) connectMQTT();
                 }, delay);
             }
         });
@@ -299,9 +277,7 @@ function connectMQTT() {
         showToast('❌ MQTT Error: ' + e.message, 'error');
         
         setTimeout(() => {
-            if (!state.mqttConnected) {
-                connectMQTT();
-            }
+            if (!state.mqttConnected) connectMQTT();
         }, 10000);
     }
 }
@@ -312,17 +288,13 @@ function handleMQTTMessage(topic, payload) {
     state.packets++;
     state.hasReceivedData = true;
     
-    // Update status ESP
     if (topic === MQTT_CONFIG.topics.statusDevice) {
         state.esp = payload === 'online' ? 'active' : 'inactive';
         renderConnStatus();
-        if (payload === 'online') {
-            showToast('✅ ESP32 Online!', 'success');
-        }
+        if (payload === 'online') showToast('✅ ESP32 Online!', 'success');
         return;
     }
     
-    // Parse sensor data
     if (topic === MQTT_CONFIG.topics.all) {
         try {
             const data = JSON.parse(payload);
@@ -344,7 +316,6 @@ function handleMQTTMessage(topic, payload) {
                 hasUpdate = true;
             }
             
-            // Update pump status from JSON
             if (data.aerator !== undefined) state.pumps.aerator = data.aerator === 'ON';
             if (data.sirkulasi !== undefined) state.pumps.sirkulasi = data.sirkulasi === 'ON';
             if (data.phup !== undefined) state.pumps.phUp = data.phup === 'ON';
@@ -357,11 +328,7 @@ function handleMQTTMessage(topic, payload) {
                 renderPhPanel();
                 renderPumps();
                 updateFuzzyLogic();
-                
-                // ★★★ JALANKAN FUZZY LOGIC ★★★
-                if (state.phMode === 'auto') {
-                    runFuzzyLogic();
-                }
+                if (state.phMode === 'auto') runFuzzyLogic();
             }
             
         } catch (e) {
@@ -370,16 +337,13 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    // Individual sensor topics
     if (topic === MQTT_CONFIG.topics.ph) {
         state.values.ph = parseFloat(payload);
         state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
         renderSensors();
         renderPhPanel();
         updateFuzzyLogic();
-        if (state.phMode === 'auto') {
-            runFuzzyLogic();
-        }
+        if (state.phMode === 'auto') runFuzzyLogic();
         return;
     }
     
@@ -397,7 +361,6 @@ function handleMQTTMessage(topic, payload) {
         return;
     }
     
-    // Pump status
     const pumpMap = {
         'hydroponic/riski/status/aerator': 'aerator',
         'hydroponic/riski/status/sirkulasi': 'sirkulasi',
@@ -476,23 +439,17 @@ function updateFuzzyLogic() {
     state.fuzzy = fuzzy;
 }
 
-// ============================================================
-// ★★★ RUN FUZZY LOGIC - EKSEKUSI ★★★
-// ============================================================
 function runFuzzyLogic() {
     const ph = state.values.ph || 0;
     const { min, max } = state.phTarget;
     
-    // Hitung fuzzy
     const fuzzy = fuzzyPhController(ph, min, max);
     state.fuzzy = fuzzy;
     
     console.log(`🧠 Fuzzy | pH: ${ph.toFixed(2)} | action: ${fuzzy.action} | strength: ${(fuzzy.strength * 100).toFixed(0)}%`);
     
-    // ★★★ EKSEKUSI - Kirim perintah ke ESP32 ★★★
     if (state.phMode === 'auto') {
         if (fuzzy.action === 'dosing-up') {
-            // Nyalakan pH Up, matikan pH Down
             if (!state.pumps.phUp) {
                 publishControl(MQTT_CONFIG.topics.controlPhUp, 'ON');
                 state.pumps.phUp = true;
@@ -503,7 +460,6 @@ function runFuzzyLogic() {
                 state.pumps.phDown = false;
             }
         } else if (fuzzy.action === 'dosing-down') {
-            // Nyalakan pH Down, matikan pH Up
             if (!state.pumps.phDown) {
                 publishControl(MQTT_CONFIG.topics.controlPhDown, 'ON');
                 state.pumps.phDown = true;
@@ -514,7 +470,6 @@ function runFuzzyLogic() {
                 state.pumps.phUp = false;
             }
         } else {
-            // Idle - matikan kedua pH pump
             if (state.pumps.phUp) {
                 publishControl(MQTT_CONFIG.topics.controlPhUp, 'OFF');
                 state.pumps.phUp = false;
@@ -524,7 +479,6 @@ function runFuzzyLogic() {
                 state.pumps.phDown = false;
             }
         }
-        
         renderPumps();
         renderPhPanel();
     }
@@ -537,7 +491,6 @@ function publishControl(topic, value) {
         return false;
     }
     
-    // ★★★ Cegah spam mode ★★★
     if (topic === MQTT_CONFIG.topics.controlPhMode) {
         const now = Date.now();
         if (value === state.lastModeSent && (now - state.modeSendTime) < 2000) {
@@ -738,7 +691,6 @@ function renderPhPanel() {
       }</p>
     </div>`;
 
-  // wire events
   panel.querySelectorAll("[data-mode]").forEach((btn) =>
     btn.addEventListener("click", () => setPhMode(btn.dataset.mode))
   );
@@ -762,11 +714,7 @@ function renderPhPanel() {
 
 function renderPumps() {
   const container = document.getElementById("pumpGroups");
-  
-  // Gabungkan PUMPS + PH_PUMPS untuk ditampilkan
   const allPumps = [...PUMPS, ...PH_PUMPS];
-  
-  // Kelompokkan berdasarkan group
   const groups = {
     "Aerasi": allPumps.filter(p => p.group === "Aerasi"),
     "Sirkulasi": allPumps.filter(p => p.group === "Sirkulasi"),
@@ -805,7 +753,6 @@ function renderPumps() {
       const key = e.target.dataset.pump;
       const val = e.target.checked;
       
-      // Cek apakah pH pump dan mode auto
       if ((key === 'phUp' || key === 'phDown') && state.phMode === 'auto') {
         showToast('⚠️ Mode AUTO, pH dikontrol otomatis!', 'warning');
         e.target.checked = state.pumps[key];
@@ -838,8 +785,6 @@ function togglePump(key, val) {
 
 function setPhMode(mode) {
   state.phMode = mode;
-  
-  // ★★★ Kirim ke ESP32 ★★★
   publishControl(MQTT_CONFIG.topics.controlPhMode, mode);
   
   if (mode === "manual") {
@@ -850,7 +795,6 @@ function setPhMode(mode) {
     showToast('🔧 Mode Manual Aktif!', 'warning');
   } else {
     showToast('🤖 Mode Auto (Fuzzy) Aktif!', 'success');
-    // Jalankan fuzzy sekali
     runFuzzyLogic();
   }
   renderPhPanel();
@@ -858,7 +802,6 @@ function setPhMode(mode) {
 }
 
 function togglePhManual(pump) {
-  // ★★★ Hanya bisa di mode manual ★★★
   if (state.phMode !== 'manual') {
     showToast('⚠️ Ganti ke mode manual dulu!', 'warning');
     return;
@@ -882,7 +825,6 @@ function applyPreset(key) {
   const p = PLANT_PRESETS.find((x) => x.key === key);
   if (p) {
     state.phTarget = { min: p.phMin, max: p.phMax };
-    // ★★★ Kirim preset ke ESP32 ★★★
     const msg = JSON.stringify({ phMin: p.phMin, phMax: p.phMax, preset: key });
     publishControl(MQTT_CONFIG.topics.controlPreset, msg);
     showToast(`🌱 Preset ${p.name} (pH ${p.phMin}-${p.phMax})`, 'success');
@@ -949,9 +891,7 @@ function showToast(message, type = 'info') {
 // ==================== RECONNECT ====================
 document.getElementById("reconnectBtn").addEventListener("click", () => {
   if (state.broker === "online") {
-    if (mqttClient) {
-      mqttClient.end();
-    }
+    if (mqttClient) mqttClient.end();
     state.broker = "offline";
     state.mqttConnected = false;
     renderConnStatus();
