@@ -1,210 +1,120 @@
 <!DOCTYPE html>
 <html lang="id">
-<head>
+  <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0a0f1a" />
+    <meta name="theme-color" content="#2f7d4f" />
     <title>Hydroponic NFT — Dashboard Monitoring</title>
-    
-    <!-- Google Fonts -->
+    <meta
+      name="description"
+      content="Monitoring & kontrol sistem hidroponik NFT: TDS, suhu, pH, dan pompa nutrisi dengan kendali pH fuzzy secara real-time."
+    />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-    
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
-    <!-- ==================== SIDEBAR ==================== -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-brand">
-                <i class="fa-solid fa-leaf"></i>
-                <span>Hydroponic</span>
-            </div>
-        </div>
-        
-        <ul class="sidebar-nav">
-            <li class="nav-item active">
-                <a href="#">
-                    <i class="fa-solid fa-gauge-high"></i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>Analytics</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    <span>History</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a href="#">
-                    <i class="fa-solid fa-gear"></i>
-                    <span>Settings</span>
-                </a>
-            </li>
-        </ul>
-        
-        <div class="sidebar-footer">
-            <div class="status-indicator" id="sidebarStatus">
-                <span class="dot" id="sidebarDot"></span>
-                <div>
-                    <span class="status-title" id="sidebarStatusTitle">Disconnected</span>
-                    <span class="status-sub" id="sidebarStatusSub">MQTT Offline</span>
-                </div>
-            </div>
-        </div>
-    </nav>
-
-    <!-- ==================== MAIN CONTENT ==================== -->
-    <main class="main-content">
-        <!-- ========== HEADER ========== -->
-        <header class="header">
-            <div class="header-left">
-                <button class="mobile-toggle" id="mobileToggleBtn">
-                    <i class="fa-solid fa-bars"></i>
-                </button>
-                <div>
-                    <h1>NFT Hydroponic</h1>
-                    <p>Real-time Monitoring &amp; Control</p>
-                </div>
-            </div>
-            <div class="header-right">
-                <div class="status-pill" id="headerStatusPill">
-                    <span class="pulse-dot" id="headerStatusDot"></span>
-                    <span id="headerSystemStatus">SYSTEM ONLINE</span>
-                </div>
-                <span class="badge-sm" id="mqttBadge">MQTT</span>
-                <span class="badge-sm" id="espBadge">ESP32</span>
-                <span class="clock" id="clock">--:--:--</span>
-            </div>
-        </header>
-
-        <!-- ========== CONN BAR ========== -->
-        <div class="conn-bar">
-            <div class="conn-item">
-                <span class="label">Host</span>
-                <span class="value" id="connHost">broker.hivemq.com</span>
-            </div>
-            <div class="conn-item">
-                <span class="label">Port</span>
-                <span class="value" id="connPort">8884 (WSS)</span>
-            </div>
-            <div class="conn-item">
-                <span class="label">Client ID</span>
-                <span class="value" id="clientId">-</span>
-            </div>
-            <div class="conn-item">
-                <span class="label">Uptime</span>
-                <span class="value" id="uptime">00:00:00</span>
-            </div>
-            <div class="conn-item">
-                <span class="label">Paket</span>
-                <span class="value" id="pktCount">0</span>
-            </div>
-            <button class="btn-reconnect" id="reconnectBtn">
-                <i class="fa-solid fa-rotate"></i> Reconnect
-            </button>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <!-- ============================= HEADER ============================= -->
+    <header class="site-header">
+      <div class="wrap header-inner">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+              <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+            </svg>
+          </div>
+          <div>
+            <h1>Hidroponik NFT</h1>
+            <p class="brand-sub">Dashboard Monitoring &amp; Kontrol</p>
+          </div>
         </div>
 
-        <!-- ========== GRID ========== -->
-        <div class="grid">
-            <!-- STATUS CARD -->
-            <div class="card status-card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-water"></i> System Status</span>
-                    <span class="badge" id="statusBadge">WAITING</span>
-                </div>
-                <div class="status-display">
-                    <div class="status-icon" id="statusIcon">
-                        <i class="fa-solid fa-hourglass-half"></i>
-                    </div>
-                    <div class="status-info">
-                        <h2 id="waterStatus">MENUNGGU</h2>
-                        <p id="statusDetail">Menunggu data dari ESP32...</p>
-                    </div>
-                </div>
-                <div class="status-meta">
-                    <span><i class="fa-regular fa-clock"></i> <span id="lastUpdate">--:--</span></span>
-                    <span><i class="fa-solid fa-signal"></i> <span id="signalStatus">--</span></span>
-                </div>
+        <!-- Status koneksi broker & perangkat -->
+        <div class="status-cluster">
+          <div class="status-pill" id="brokerPill">
+            <span class="dot" id="brokerDot"></span>
+            <div class="status-text">
+              <span class="status-label">Broker MQTT</span>
+              <span class="status-value" id="brokerStatus">Menghubungkan…</span>
             </div>
-
-            <!-- SENSOR PARAMS -->
-            <div class="card sensors-card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-microchip"></i> Sensor Readings</span>
-                </div>
-                <div class="sensor-grid" id="sensorGrid"></div>
+          </div>
+          <div class="status-pill" id="espPill">
+            <span class="dot" id="espDot"></span>
+            <div class="status-text">
+              <span class="status-label">ESP32</span>
+              <span class="status-value" id="espStatus">Menunggu…</span>
             </div>
-
-            <!-- PUMPS -->
-            <div class="card pumps-card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-plug"></i> Pump Controls</span>
-                    <span class="badge"><span id="activePumps">0</span> aktif</span>
-                </div>
-                <div class="pump-grid" id="pumpGrid"></div>
-            </div>
-
-            <!-- PH + PRESET -->
-            <div class="card ph-card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-flask"></i> pH Control &amp; Preset</span>
-                    <span class="badge" id="presetBadge">Manual</span>
-                </div>
-                <div class="ph-panel" id="phPanel"></div>
-            </div>
-
-            <!-- CHART -->
-            <div class="card chart-card">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-chart-line"></i> Environmental Trends</span>
-                    <div class="chart-tabs">
-                        <button class="chart-tab active" data-target="temp">🌡️ Temp</button>
-                        <button class="chart-tab" data-target="ph">🧪 pH</button>
-                        <button class="chart-tab" data-target="tds">💧 TDS</button>
-                    </div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="environmentChart"></canvas>
-                </div>
-            </div>
-
-            <!-- RAW DATA -->
-            <div class="card full-width">
-                <div class="card-header">
-                    <span class="card-title"><i class="fa-solid fa-code"></i> Telemetry Data</span>
-                    <button class="btn-copy" id="btnCopyData">📋 Copy</button>
-                </div>
-                <pre class="code-block" id="lastMessage">Menunggu data dari ESP32...</pre>
-            </div>
+          </div>
+          <div class="clock" id="clock">--:--:--</div>
         </div>
+      </div>
+    </header>
 
-        <!-- ========== FOOTER ========== -->
-        <footer class="footer">
-            <p>Hydroponic NFT Dashboard v2.0 &bull; Data real-time via MQTT &bull; <span id="footerTime"></span></p>
-        </footer>
+    <main class="wrap main">
+      <!-- ======================= INFO KONEKSI ======================= -->
+      <section class="conn-bar" aria-label="Informasi koneksi">
+        <div class="conn-item">
+          <span class="conn-k">Host</span>
+          <span class="conn-v mono" id="connHost">broker.hivemq.com</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Port</span>
+          <span class="conn-v mono">8084 (WSS)</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Client ID</span>
+          <span class="conn-v mono" id="clientId">-</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Uptime</span>
+          <span class="conn-v mono" id="uptime">00:00:00</span>
+        </div>
+        <div class="conn-item">
+          <span class="conn-k">Paket Diterima</span>
+          <span class="conn-v mono" id="pktCount">0</span>
+        </div>
+        <button class="btn-reconnect" id="reconnectBtn" type="button">Sambungkan</button>
+      </section>
+
+      <!-- ========================= SENSOR ========================= -->
+      <section aria-label="Pembacaan sensor">
+        <h2 class="section-title">Pembacaan Sensor</h2>
+        <div class="sensor-grid" id="sensorGrid"></div>
+      </section>
+
+      <!-- ========================= KONTROL pH ========================= -->
+      <section aria-label="Kontrol pH" class="mt">
+        <h2 class="section-title">Kontrol pH Larutan Nutrisi (Fuzzy)</h2>
+        <div class="ph-panel" id="phPanel"></div>
+      </section>
+
+      <!-- ========================= POMPA ========================= -->
+      <section aria-label="Kontrol pompa" class="mt">
+        <div class="section-head">
+          <h2 class="section-title mb0">Kontrol Pompa</h2>
+          <span class="badge-count"><span id="activePumps">0</span> aktif</span>
+        </div>
+        <div class="pump-groups" id="pumpGroups"></div>
+      </section>
+
+      <footer class="foot">
+        <p>
+          Data real-time dari ESP32 via MQTT broker HiveMQ.
+          Gunakan dashboard ini untuk memonitor dan mengontrol sistem hidroponik NFT.
+        </p>
+      </footer>
     </main>
 
-    <!-- ==================== OVERLAY ==================== -->
-    <div class="sidebar-overlay" id="sidebarOverlay"></div>
-
-    <!-- ==================== TOAST ==================== -->
+    <!-- ========================= TOAST CONTAINER ========================= -->
     <div id="toastContainer"></div>
 
-    <!-- ==================== SCRIPTS ==================== -->
+    <!-- ========================= MQTT LIBRARY ========================= -->
     <script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="js/app.js"></script>
-</body>
+    <script src="app.js"></script>
+  </body>
 </html>
