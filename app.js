@@ -34,7 +34,8 @@ const MQTT_CONFIG = {
         statusNutrisiA: 'hydroponic/riski/status/nutrisia',
         statusNutrisiB: 'hydroponic/riski/status/nutrisib',
         statusDevice: 'hydroponic/riski/status/device',
-        statusDashboard: 'hydroponic/riski/status/dashboard'
+        statusDashboard: 'hydroponic/riski/status/dashboard',
+        statusRequest: 'hydroponic/riski/status/request'
     }
 };
 
@@ -76,13 +77,21 @@ const SENSORS = [
 ];
 
 // ==================== KONFIGURASI POMPA ====================
+// UPDATE: Sesuai dengan pin terbaru
 const PUMPS = [
-  { key: "aerator", name: "Aerator", pin: 12, group: "Aerasi", controlTopic: MQTT_CONFIG.topics.controlAerator, statusTopic: MQTT_CONFIG.topics.statusAerator },
-  { key: "sirkulasi1", name: "Sirkulasi 1", pin: 13, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi1, statusTopic: MQTT_CONFIG.topics.statusSirkulasi1 },
-  { key: "sirkulasi2", name: "Sirkulasi 2", pin: 11, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi2, statusTopic: MQTT_CONFIG.topics.statusSirkulasi2 },
-  { key: "nutrisiA", name: "Nutrisi A", pin: 14, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiA, statusTopic: MQTT_CONFIG.topics.statusNutrisiA },
-  { key: "nutrisiB", name: "Nutrisi B", pin: 17, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiB, statusTopic: MQTT_CONFIG.topics.statusNutrisiB },
+  { key: "aerator", name: "Aerator", pin: 13, group: "Aerasi", controlTopic: MQTT_CONFIG.topics.controlAerator, statusTopic: MQTT_CONFIG.topics.statusAerator },
+  { key: "sirkulasi1", name: "Sirkulasi 1", pin: 14, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi1, statusTopic: MQTT_CONFIG.topics.statusSirkulasi1 },
+  { key: "sirkulasi2", name: "Sirkulasi 2", pin: 27, group: "Sirkulasi", controlTopic: MQTT_CONFIG.topics.controlSirkulasi2, statusTopic: MQTT_CONFIG.topics.statusSirkulasi2 },
+  { key: "nutrisiA", name: "Nutrisi A", pin: 33, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiA, statusTopic: MQTT_CONFIG.topics.statusNutrisiA },
+  { key: "nutrisiB", name: "Nutrisi B", pin: 32, group: "Dosis Nutrisi", controlTopic: MQTT_CONFIG.topics.controlNutrisiB, statusTopic: MQTT_CONFIG.topics.statusNutrisiB },
 ];
+
+// pH Pumps (terpisah karena kontrol khusus)
+const PH_PUMPS = [
+  { key: "phUp", name: "pH Up", pin: 26, controlTopic: MQTT_CONFIG.topics.controlPhUp, statusTopic: MQTT_CONFIG.topics.statusPhUp },
+  { key: "phDown", name: "pH Down", pin: 25, controlTopic: MQTT_CONFIG.topics.controlPhDown, statusTopic: MQTT_CONFIG.topics.statusPhDown }
+];
+
 const PUMP_GROUP_ORDER = ["Aerasi", "Sirkulasi", "Dosis Nutrisi"];
 
 // ==================== PRESET TANAMAN ====================
@@ -121,7 +130,9 @@ const state = {
   startTime: Date.now(),
   mqttConnected: false,
   clientId: '',
-  hasReceivedData: false
+  hasReceivedData: false,
+  lastSensorUpdate: 0,
+  isConnecting: false
 };
 
 // seed flat history
@@ -131,13 +142,20 @@ SENSORS.forEach((s) => {
 
 // ==================== MQTT CLIENT ====================
 let mqttClient = null;
-let reconnectTimer = null;
 
 // ==================== INIT ====================
 document.addEventListener('DOMContentLoaded', () => {
     console.log('🌱 Hydroponic NFT Dashboard');
     console.log('📡 MQTT Broker:', MQTT_CONFIG.broker);
     console.log('📡 Topics:', MQTT_CONFIG.topics);
+    console.log('🔌 GPIO Configuration:');
+    console.log('  - Aerator    : GPIO13');
+    console.log('  - Sirkulasi 1: GPIO14');
+    console.log('  - Sirkulasi 2: GPIO27');
+    console.log('  - pH Up      : GPIO26');
+    console.log('  - pH Down    : GPIO25');
+    console.log('  - Nutrisi A  : GPIO33');
+    console.log('  - Nutrisi B  : GPIO32');
     
     renderSensors();
     renderPhPanel();
@@ -147,10 +165,28 @@ document.addEventListener('DOMContentLoaded', () => {
     
     setInterval(tickClock, 1000);
     tickClock();
+    
+    // Auto-refresh sensor setiap 30s jika tidak ada data
+    setInterval(() => {
+        if (!state.hasReceivedData && state.broker === 'online') {
+            requestStatus();
+        }
+    }, 30000);
 });
+
+// ==================== REQUEST STATUS ====================
+function requestStatus() {
+    if (mqttClient && mqttClient.connected) {
+        mqttClient.publish(MQTT_CONFIG.topics.statusRequest, 'STATUS', { qos: 1 });
+        console.log('📤 Requesting status from ESP32...');
+        showToast('📡 Meminta data dari ESP32...', 'info');
+    }
+}
 
 // ==================== CONNECT MQTT ====================
 function connectMQTT() {
+    if (state.isConnecting) return;
+    
     if (mqttClient && mqttClient.connected) {
         mqttClient.end();
         mqttClient = null;
@@ -158,11 +194,13 @@ function connectMQTT() {
     
     state.broker = "connecting";
     state.mqttConnected = false;
+    state.isConnecting = true;
     renderConnStatus();
     
     const clientId = 'dashboard_' + Math.random().toString(16).substr(2, 8);
     state.clientId = clientId;
-    document.getElementById('clientId').textContent = clientId;
+    const clientIdEl = document.getElementById('clientId');
+    if (clientIdEl) clientIdEl.textContent = clientId;
     
     const options = {
         clientId: clientId,
@@ -180,6 +218,7 @@ function connectMQTT() {
     
     console.log('🔄 Connecting to MQTT...');
     console.log('📡 Broker:', MQTT_CONFIG.broker);
+    showToast('🔄 Menghubungkan ke MQTT...', 'info');
     
     try {
         mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
@@ -188,10 +227,11 @@ function connectMQTT() {
             console.log('✅ MQTT Connected to HiveMQ');
             state.broker = "online";
             state.mqttConnected = true;
+            state.isConnecting = false;
             state.startTime = Date.now();
             renderConnStatus();
             
-            showToast('✅ MQTT Connected!', 'success');
+            showToast('✅ MQTT Terhubung!', 'success');
             
             // Subscribe ke semua topik
             const topics = [
@@ -227,10 +267,7 @@ function connectMQTT() {
             
             // Request status dari ESP32
             setTimeout(() => {
-                if (mqttClient && mqttClient.connected) {
-                    mqttClient.publish('hydroponic/riski/status/request', 'STATUS');
-                    showToast('📡 Menunggu data dari ESP32...', 'info');
-                }
+                requestStatus();
             }, 1000);
         });
         
@@ -244,6 +281,7 @@ function connectMQTT() {
             console.error('❌ MQTT Error:', err);
             state.broker = "offline";
             state.mqttConnected = false;
+            state.isConnecting = false;
             renderConnStatus();
             showToast('❌ MQTT Error: ' + err.message, 'error');
         });
@@ -252,6 +290,7 @@ function connectMQTT() {
             console.log('⚠️ MQTT Offline');
             state.broker = "offline";
             state.mqttConnected = false;
+            state.isConnecting = false;
             renderConnStatus();
         });
         
@@ -265,12 +304,14 @@ function connectMQTT() {
             console.log('🔌 MQTT Connection Closed');
             state.broker = "offline";
             state.mqttConnected = false;
+            state.isConnecting = false;
             renderConnStatus();
         });
         
     } catch (e) {
         console.error('❌ MQTT Init error:', e);
         state.broker = "offline";
+        state.isConnecting = false;
         renderConnStatus();
         showToast('❌ MQTT Error: ' + e.message, 'error');
         
@@ -292,6 +333,9 @@ function handleMQTTMessage(topic, payload) {
     if (topic === MQTT_CONFIG.topics.statusDevice) {
         state.esp = payload === 'online' ? 'active' : 'inactive';
         renderConnStatus();
+        if (payload === 'online') {
+            showToast('✅ ESP32 Online!', 'success');
+        }
         return;
     }
     
@@ -299,22 +343,41 @@ function handleMQTTMessage(topic, payload) {
     if (topic === MQTT_CONFIG.topics.all) {
         try {
             const data = JSON.parse(payload);
-            if (data.ph !== undefined) {
+            let hasUpdate = false;
+            
+            if (data.ph !== undefined && !isNaN(data.ph)) {
                 state.values.ph = parseFloat(data.ph);
                 state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
+                hasUpdate = true;
             }
-            if (data.tds !== undefined) {
+            if (data.tds !== undefined && !isNaN(data.tds)) {
                 state.values.tds = parseFloat(data.tds);
                 state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
+                hasUpdate = true;
             }
-            if (data.temperature !== undefined) {
+            if (data.temperature !== undefined && !isNaN(data.temperature)) {
                 state.values.temp = parseFloat(data.temperature);
                 state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
+                hasUpdate = true;
             }
             
-            renderSensors();
-            renderPhPanel();
-            updateFuzzyLogic();
+            // Update pump status from JSON
+            if (data.aerator !== undefined) state.pumps.aerator = data.aerator === 'ON';
+            if (data.sirkulasi1 !== undefined) state.pumps.sirkulasi1 = data.sirkulasi1 === 'ON';
+            if (data.sirkulasi2 !== undefined) state.pumps.sirkulasi2 = data.sirkulasi2 === 'ON';
+            if (data.phup !== undefined) state.pumps.phUp = data.phup === 'ON';
+            if (data.phdown !== undefined) state.pumps.phDown = data.phdown === 'ON';
+            if (data.nutrisia !== undefined) state.pumps.nutrisiA = data.nutrisia === 'ON';
+            if (data.nutrisib !== undefined) state.pumps.nutrisiB = data.nutrisib === 'ON';
+            
+            if (hasUpdate) {
+                state.lastSensorUpdate = Date.now();
+                renderSensors();
+                renderPhPanel();
+                renderPumps();
+                updateFuzzyLogic();
+                console.log('📊 Data updated:', state.values);
+            }
             
         } catch (e) {
             console.warn('⚠️ Failed to parse JSON:', e);
@@ -324,25 +387,37 @@ function handleMQTTMessage(topic, payload) {
     
     // Individual sensor topics
     if (topic === MQTT_CONFIG.topics.ph) {
-        state.values.ph = parseFloat(payload);
-        state.history.ph = state.history.ph.slice(1).concat(state.values.ph);
-        renderSensors();
-        renderPhPanel();
-        updateFuzzyLogic();
+        const val = parseFloat(payload);
+        if (!isNaN(val)) {
+            state.values.ph = val;
+            state.history.ph = state.history.ph.slice(1).concat(val);
+            state.lastSensorUpdate = Date.now();
+            renderSensors();
+            renderPhPanel();
+            updateFuzzyLogic();
+        }
         return;
     }
     
     if (topic === MQTT_CONFIG.topics.tds) {
-        state.values.tds = parseFloat(payload);
-        state.history.tds = state.history.tds.slice(1).concat(state.values.tds);
-        renderSensors();
+        const val = parseFloat(payload);
+        if (!isNaN(val)) {
+            state.values.tds = val;
+            state.history.tds = state.history.tds.slice(1).concat(val);
+            state.lastSensorUpdate = Date.now();
+            renderSensors();
+        }
         return;
     }
     
     if (topic === MQTT_CONFIG.topics.temp) {
-        state.values.temp = parseFloat(payload);
-        state.history.temp = state.history.temp.slice(1).concat(state.values.temp);
-        renderSensors();
+        const val = parseFloat(payload);
+        if (!isNaN(val)) {
+            state.values.temp = val;
+            state.history.temp = state.history.temp.slice(1).concat(val);
+            state.lastSensorUpdate = Date.now();
+            renderSensors();
+        }
         return;
     }
     
@@ -358,7 +433,8 @@ function handleMQTTMessage(topic, payload) {
     };
     
     if (pumpMap[topic]) {
-        state.pumps[pumpMap[topic]] = payload === 'ON';
+        const newState = payload === 'ON';
+        state.pumps[pumpMap[topic]] = newState;
         renderPumps();
         renderPhPanel();
         return;
@@ -427,17 +503,19 @@ function updateFuzzyLogic() {
 // ==================== PUBLISH CONTROL ====================
 function publishControl(topic, value) {
     if (!mqttClient || !mqttClient.connected) {
-        showToast('⚠️ MQTT not connected!', 'warning');
+        showToast('⚠️ MQTT tidak terhubung!', 'warning');
         return false;
     }
     
     try {
         mqttClient.publish(topic, value, { qos: 1 });
         console.log('📤', topic, '->', value);
+        const name = topic.split('/').pop();
+        showToast(`📤 ${name}: ${value}`, 'info');
         return true;
     } catch (e) {
         console.error('❌ Publish error:', e);
-        showToast('❌ Failed to publish: ' + e.message, 'error');
+        showToast('❌ Gagal publish: ' + e.message, 'error');
         return false;
     }
 }
@@ -451,15 +529,25 @@ function renderConnStatus() {
   const eTxt = document.getElementById("espStatus");
   const reBtn = document.getElementById("reconnectBtn");
 
-  bDot.className = "dot " + (state.broker === "online" ? "online" : state.broker === "connecting" ? "connecting" : "offline");
-  bTxt.textContent = state.broker === "online" ? "Terhubung" : state.broker === "connecting" ? "Menghubungkan…" : "Terputus";
+  if (bDot) {
+    bDot.className = "dot " + (state.broker === "online" ? "online" : state.broker === "connecting" ? "connecting" : "offline");
+  }
+  if (bTxt) {
+    bTxt.textContent = state.broker === "online" ? "Terhubung" : state.broker === "connecting" ? "Menghubungkan…" : "Terputus";
+  }
 
   const espOk = state.broker === "online" && state.esp === "active";
-  eDot.className = "dot " + (espOk ? "online" : state.esp === "waiting" ? "connecting" : "offline");
-  eTxt.textContent = !state.broker || state.broker !== "online" ? "Tidak ada sinyal" : espOk ? "Aktif" : state.esp === "waiting" ? "Menunggu…" : "Tidak aktif";
+  if (eDot) {
+    eDot.className = "dot " + (espOk ? "online" : state.esp === "waiting" ? "connecting" : "offline");
+  }
+  if (eTxt) {
+    eTxt.textContent = !state.broker || state.broker !== "online" ? "Tidak ada sinyal" : espOk ? "Aktif" : state.esp === "waiting" ? "Menunggu…" : "Tidak aktif";
+  }
 
-  reBtn.textContent = state.broker === "online" ? "Putuskan" : "Sambungkan";
-  reBtn.className = "btn-reconnect" + (state.broker === "online" ? "" : " reconnect");
+  if (reBtn) {
+    reBtn.textContent = state.broker === "online" ? "Putuskan" : "Sambungkan";
+    reBtn.className = "btn-reconnect" + (state.broker === "online" ? "" : " reconnect");
+  }
 }
 
 function sensorStatus(cfg, v) {
@@ -488,6 +576,8 @@ function sparkPath(data, w, h) {
 
 function renderSensors() {
   const grid = document.getElementById("sensorGrid");
+  if (!grid) return;
+  
   grid.innerHTML = SENSORS.map((s) => {
     const v = state.values[s.key] || 0;
     const st = sensorStatus(s, v);
@@ -527,6 +617,8 @@ function renderSensors() {
 
 function renderPhPanel() {
   const panel = document.getElementById("phPanel");
+  if (!panel) return;
+  
   const ph = state.values.ph || 0;
   const { min, max } = state.phTarget;
   const inRange = ph >= min && max >= ph;
@@ -602,13 +694,13 @@ function renderPhPanel() {
       <div class="dose-cards">
         <div class="dose-card ${upActive ? "active" : ""}">
           <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg> pH Up</h4>
-          <div class="chem">GPIO 10 · KOH 10%</div>
+          <div class="chem">GPIO 26 · KOH 10%</div>
           <div class="dose-status ${upActive ? "on" : ""}">${upActive ? "Mendosis…" : "Standby"}</div>
           <button class="dose-btn ${upActive ? "on" : ""}" data-dose="phUp" ${manual ? "" : "disabled"}>${upActive ? "Matikan" : "Nyalakan"}</button>
         </div>
         <div class="dose-card ${downActive ? "active" : ""}">
           <h4><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg> pH Down</h4>
-          <div class="chem">GPIO 46 · H₃PO₄</div>
+          <div class="chem">GPIO 25 · H₃PO₄</div>
           <div class="dose-status ${downActive ? "on" : ""}">${downActive ? "Mendosis…" : "Standby"}</div>
           <button class="dose-btn ${downActive ? "on" : ""}" data-dose="phDown" ${manual ? "" : "disabled"}>${downActive ? "Matikan" : "Nyalakan"}</button>
         </div>
@@ -633,7 +725,7 @@ function renderPhPanel() {
   const phMinEl = panel.querySelector("#phMin");
   const phMaxEl = panel.querySelector("#phMax");
   [phMinEl, phMaxEl].forEach((el) =>
-    el.addEventListener("change", () => {
+    el && el.addEventListener("change", () => {
       const mn = clamp(parseFloat(phMinEl.value), PH_ALLOWED_MIN, PH_ALLOWED_MAX);
       const mx = clamp(parseFloat(phMaxEl.value), PH_ALLOWED_MIN, PH_ALLOWED_MAX);
       state.phTarget = { min: Math.min(mn, mx), max: Math.max(mn, mx) };
@@ -645,6 +737,8 @@ function renderPhPanel() {
 
 function renderPumps() {
   const container = document.getElementById("pumpGroups");
+  if (!container) return;
+  
   container.innerHTML = PUMP_GROUP_ORDER.map((group) => {
     const rows = PUMPS.filter((p) => p.group === group)
       .map((p) => {
@@ -673,7 +767,8 @@ function renderPumps() {
   );
 
   const active = Object.values(state.pumps).filter(Boolean).length;
-  document.getElementById("activePumps").textContent = active;
+  const activeEl = document.getElementById("activePumps");
+  if (activeEl) activeEl.textContent = active;
 }
 
 function clamp(v, a, b) {
@@ -729,13 +824,23 @@ function pad(n) {
 
 function tickClock() {
   const now = new Date();
-  document.getElementById("clock").textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-  document.getElementById("pktCount").textContent = state.packets.toLocaleString("id-ID");
-  if (state.broker === "online") {
-    const s = Math.floor((Date.now() - state.startTime) / 1000);
-    document.getElementById("uptime").textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
-  } else {
-    document.getElementById("uptime").textContent = "00:00:00";
+  const clockEl = document.getElementById("clock");
+  const pktEl = document.getElementById("pktCount");
+  const uptimeEl = document.getElementById("uptime");
+  
+  if (clockEl) {
+    clockEl.textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  }
+  if (pktEl) {
+    pktEl.textContent = state.packets.toLocaleString("id-ID");
+  }
+  if (uptimeEl) {
+    if (state.broker === "online") {
+      const s = Math.floor((Date.now() - state.startTime) / 1000);
+      uptimeEl.textContent = `${pad(Math.floor(s / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+    } else {
+      uptimeEl.textContent = "00:00:00";
+    }
   }
 }
 
@@ -779,20 +884,23 @@ function showToast(message, type = 'info') {
 }
 
 // ==================== RECONNECT ====================
-document.getElementById("reconnectBtn").addEventListener("click", () => {
-  if (state.broker === "online") {
-    if (mqttClient) {
-      mqttClient.end();
+const reconnectBtn = document.getElementById("reconnectBtn");
+if (reconnectBtn) {
+  reconnectBtn.addEventListener("click", () => {
+    if (state.broker === "online") {
+      if (mqttClient) {
+        mqttClient.end();
+      }
+      state.broker = "offline";
+      state.mqttConnected = false;
+      renderConnStatus();
+      showToast('🔌 Terputus dari MQTT', 'info');
+    } else {
+      connectMQTT();
+      showToast('🔄 Menghubungkan ke MQTT...', 'info');
     }
-    state.broker = "offline";
-    state.mqttConnected = false;
-    renderConnStatus();
-    showToast('🔌 Disconnected from MQTT', 'info');
-  } else {
-    connectMQTT();
-    showToast('🔄 Connecting to MQTT...', 'info');
-  }
-});
+  });
+}
 
 // ==================== ADD TOAST STYLES ====================
 const style = document.createElement('style');
@@ -812,3 +920,11 @@ renderConnStatus();
 
 console.log('✅ Dashboard ready!');
 console.log('📡 Monitoring MQTT topics:', MQTT_CONFIG.topics);
+console.log('🔌 GPIO Configuration:');
+console.log('  - Aerator    : GPIO13');
+console.log('  - Sirkulasi 1: GPIO14');
+console.log('  - Sirkulasi 2: GPIO27');
+console.log('  - pH Up      : GPIO26');
+console.log('  - pH Down    : GPIO25');
+console.log('  - Nutrisi A  : GPIO33');
+console.log('  - Nutrisi B  : GPIO32');
