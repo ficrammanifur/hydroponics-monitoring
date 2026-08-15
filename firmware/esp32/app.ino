@@ -1,13 +1,28 @@
 /*
  * ============================================================
- * HYDROPONIC NFT SYSTEM - ESP32 FIRMWARE with WiFiManager
+ * HYDROPONIC NFT - ESP32 FIRMWARE
  * ============================================================
- * Fitur:
- * - Monitoring pH, TDS, Suhu
- * - Kontrol 7 Pompa (Aerator, Sirkulasi, Nutrisi, pH)
- * - MQTT Integration (HiveMQ)
- * - Fuzzy Logic untuk kontrol pH otomatis
- * - WiFiManager untuk konfigurasi WiFi mudah
+ * ESP32 hanya: Baca sensor + Terima perintah relay
+ * Fuzzy Logic berjalan di Dashboard (JavaScript)
+ * ============================================================
+ * 
+ * RELAY CONFIG (ACTIVE LOW):
+ * LOW  = ON (Relay aktif)
+ * HIGH = OFF (Relay mati)
+ * 
+ * Relay 1 -> GPIO 13 -> Aerator
+ * Relay 2 -> GPIO 14 -> Sirkulasi
+ * Relay 3 -> GPIO 26 -> pH Up
+ * Relay 4 -> GPIO 25 -> pH Down
+ * Relay 5 -> GPIO 33 -> Nutrisi A
+ * Relay 6 -> GPIO 32 -> Nutrisi B
+ * 
+ * Sensor:
+ * pH     -> GPIO 34 (ADC1)
+ * TDS    -> GPIO 35 (ADC1)
+ * Suhu   -> GPIO 4  (DS18B20)
+ * 
+ * LCD I2C -> SDA=21, SCL=22
  * ============================================================
  */
 
@@ -15,29 +30,26 @@
 #include <PubSubClient.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <ArduinoJson.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include <Preferences.h>
-#include <WiFiManager.h>  // Library WiFiManager
+#include <WiFiManager.h>
+#include <ArduinoJson.h>
 
 // ==================== VERSION ====================
-#define FIRMWARE_VERSION "2.1.0"
-#define DEVICE_NAME "esp32-hydroponic"
+#define FIRMWARE_VERSION "3.0.0"
 
 // ==================== PIN DEFINITIONS ====================
-// Relay Pumps
+// Relay Pumps (ACTIVE LOW: LOW = ON, HIGH = OFF)
 #define PIN_AERATOR      13
-#define PIN_SIRKULASI_1  14
-#define PIN_SIRKULASI_2  27
+#define PIN_SIRKULASI    14
 #define PIN_PH_UP        26
 #define PIN_PH_DOWN      25
 #define PIN_NUTRISI_A    33
 #define PIN_NUTRISI_B    32
 
 // Sensors
-#define PIN_TDS  35   // ADC1 Input Only (aman saat WiFi aktif)
-#define PIN_PH   34   // ADC1 Input Only (aman saat WiFi aktif)
+#define PIN_TDS  35   // ADC1 Input Only
+#define PIN_PH   34   // ADC1 Input Only
 #define PIN_TEMP 4    // DS18B20 1-Wire
 
 // I2C LCD
@@ -67,16 +79,15 @@ const int MQTT_PORT = 1883;
 #define TOPIC_SENSOR_ALL     "hydroponic/riski/sensor/all"
 
 #define TOPIC_CONTROL_AERATOR    "hydroponic/riski/control/aerator"
-#define TOPIC_CONTROL_SIRKULASI1 "hydroponic/riski/control/sirkulasi1"
-#define TOPIC_CONTROL_SIRKULASI2 "hydroponic/riski/control/sirkulasi2"
+#define TOPIC_CONTROL_SIRKULASI  "hydroponic/riski/control/sirkulasi"
 #define TOPIC_CONTROL_PHUP       "hydroponic/riski/control/phup"
 #define TOPIC_CONTROL_PHDOWN     "hydroponic/riski/control/phdown"
 #define TOPIC_CONTROL_NUTRISIA   "hydroponic/riski/control/nutrisia"
 #define TOPIC_CONTROL_NUTRISIB   "hydroponic/riski/control/nutrisib"
+#define TOPIC_CONTROL_PHMODE     "hydroponic/riski/control/phmode"
 
 #define TOPIC_STATUS_AERATOR    "hydroponic/riski/status/aerator"
-#define TOPIC_STATUS_SIRKULASI1 "hydroponic/riski/status/sirkulasi1"
-#define TOPIC_STATUS_SIRKULASI2 "hydroponic/riski/status/sirkulasi2"
+#define TOPIC_STATUS_SIRKULASI  "hydroponic/riski/status/sirkulasi"
 #define TOPIC_STATUS_PHUP       "hydroponic/riski/status/phup"
 #define TOPIC_STATUS_PHDOWN     "hydroponic/riski/status/phdown"
 #define TOPIC_STATUS_NUTRISIA   "hydroponic/riski/status/nutrisia"
@@ -99,17 +110,28 @@ float phFiltered = 6.0;
 float temperatureC = 25.0;
 
 // ==================== PUMP CONFIG ====================
-#define NUM_PUMPS 7
-int pumpPins[NUM_PUMPS] = {PIN_AERATOR, PIN_SIRKULASI_1, PIN_SIRKULASI_2, PIN_PH_UP, PIN_PH_DOWN, PIN_NUTRISI_A, PIN_NUTRISI_B};
-bool pumpState[NUM_PUMPS] = {false, false, false, false, false, false, false};
-const char* pumpNames[NUM_PUMPS] = {"Aerator", "Sirkulasi1", "Sirkulasi2", "pH Up", "pH Down", "Nutrisi A", "Nutrisi B"};
-const char* controlTopics[NUM_PUMPS] = {
-    TOPIC_CONTROL_AERATOR, TOPIC_CONTROL_SIRKULASI1, TOPIC_CONTROL_SIRKULASI2,
-    TOPIC_CONTROL_PHUP, TOPIC_CONTROL_PHDOWN, TOPIC_CONTROL_NUTRISIA, TOPIC_CONTROL_NUTRISIB
+#define NUM_PUMPS 6
+
+int pumpPins[NUM_PUMPS] = {
+    PIN_AERATOR, PIN_SIRKULASI, PIN_PH_UP, PIN_PH_DOWN, PIN_NUTRISI_A, PIN_NUTRISI_B
 };
+
+bool pumpState[NUM_PUMPS] = {false, false, false, false, false, false};
+
+const char* pumpNames[NUM_PUMPS] = {
+    "Aerator", "Sirkulasi", "pH Up", "pH Down", "Nutrisi A", "Nutrisi B"
+};
+
+const char* controlTopics[NUM_PUMPS] = {
+    TOPIC_CONTROL_AERATOR, TOPIC_CONTROL_SIRKULASI,
+    TOPIC_CONTROL_PHUP, TOPIC_CONTROL_PHDOWN, 
+    TOPIC_CONTROL_NUTRISIA, TOPIC_CONTROL_NUTRISIB
+};
+
 const char* statusTopics[NUM_PUMPS] = {
-    TOPIC_STATUS_AERATOR, TOPIC_STATUS_SIRKULASI1, TOPIC_STATUS_SIRKULASI2,
-    TOPIC_STATUS_PHUP, TOPIC_STATUS_PHDOWN, TOPIC_STATUS_NUTRISIA, TOPIC_STATUS_NUTRISIB
+    TOPIC_STATUS_AERATOR, TOPIC_STATUS_SIRKULASI,
+    TOPIC_STATUS_PHUP, TOPIC_STATUS_PHDOWN, 
+    TOPIC_STATUS_NUTRISIA, TOPIC_STATUS_NUTRISIB
 };
 
 // ==================== SENSOR VALUES ====================
@@ -128,17 +150,8 @@ const unsigned long LCD_UPDATE_INTERVAL = 1000;
 unsigned long lastWiFiCheck = 0;
 const unsigned long WIFI_CHECK_INTERVAL = 30000;
 
-// ==================== FUZZY LOGIC ====================
-float fuzzyStrength = 0.0;
-String fuzzyAction = "idle";
-float phTargetMin = 5.8;
-float phTargetMax = 6.3;
-unsigned long lastFuzzyUpdate = 0;
-const unsigned long FUZZY_INTERVAL = 3000;
-bool phModeAuto = true;  // true = auto, false = manual
-
-// ==================== PREFERENCES ====================
-Preferences prefs;
+// ==================== MODE ====================
+bool phModeAuto = true;  // Default AUTO (Fuzzy di dashboard)
 
 // ==================== FUNCTION PROTOTYPES ====================
 void setupPumps();
@@ -153,9 +166,10 @@ void updateLCD();
 void setupWiFiManager();
 void startAPMode();
 void publishPumpStatus(int index);
-void fuzzyLogicController();
 void handlePumpControl(int index, bool state);
 void checkWiFiConnection();
+void printStatus();
+void printHelp();
 
 // ============================================================
 // SETUP
@@ -165,9 +179,11 @@ void setup() {
     delay(1000);
     
     Serial.println("\n========================================");
-    Serial.println(" HYDROPONIC NFT SYSTEM");
+    Serial.println(" HYDROPONIC NFT - SIMPLE VERSION");
     Serial.println(" Firmware: " + String(FIRMWARE_VERSION));
     Serial.println("========================================\n");
+    Serial.println("📌 Fuzzy Logic berjalan di Dashboard!");
+    Serial.println("📌 ESP32 hanya: Baca sensor + Terima perintah\n");
     
     // ===== LCD =====
     Wire.begin(I2C_SDA, I2C_SCL);
@@ -189,13 +205,6 @@ void setup() {
     // ===== Pumps =====
     setupPumps();
     
-    // ===== Preferences =====
-    prefs.begin("hydroponic", false);
-    phTargetMin = prefs.getFloat("phMin", 5.8);
-    phTargetMax = prefs.getFloat("phMax", 6.3);
-    phModeAuto = prefs.getBool("phMode", true);
-    prefs.end();
-    
     // ===== WiFi Manager =====
     setupWiFiManager();
     
@@ -213,7 +222,9 @@ void setup() {
     lcd.clear();
     lcd.setCursor(0, 0);
     lcd.print("System Ready!");
-    delay(1000);
+    lcd.setCursor(0, 1);
+    lcd.print("Fuzzy: Dashboard");
+    delay(2000);
     updateLCD();
     
     Serial.println("[OK] System initialized");
@@ -222,6 +233,7 @@ void setup() {
     Serial.println(" status  - Show system status");
     Serial.println(" reset   - Restart ESP32");
     Serial.println(" wm      - Open WiFiManager portal");
+    Serial.println(" help    - Show help");
     Serial.println("========================================\n");
 }
 
@@ -245,11 +257,9 @@ void setupWiFiManager() {
     lcd.setCursor(0, 3);
     lcd.print("pwd: password1234");
     
-    // Set timeout untuk config portal
     wifiManager.setConfigPortalTimeout(180);
     wifiManager.setConnectTimeout(20);
     
-    // Callback saat masuk AP Mode
     wifiManager.setAPCallback([&](WiFiManager* myWiFiManager) {
         Serial.println("[WiFi] Entered AP Mode");
         lcd.clear();
@@ -261,12 +271,10 @@ void setupWiFiManager() {
         lcd.print("IP: 192.168.4.1");
     });
     
-    // Callback saat WiFi berhasil terkoneksi
     wifiManager.setSaveConfigCallback([&]() {
         Serial.println("[WiFi] Configuration saved!");
     });
     
-    // Coba konek ke WiFi yang sudah tersimpan
     bool res = wifiManager.autoConnect("Hydroponic_NFT", "password1234");
     
     if (!res) {
@@ -298,7 +306,7 @@ void setupWiFiManager() {
 }
 
 // ============================================================
-// START AP MODE (Manual)
+// START AP MODE
 // ============================================================
 void startAPMode() {
     Serial.println("[WiFi] Starting Access Point Mode...");
@@ -321,7 +329,6 @@ void startAPMode() {
     lcd.setCursor(0, 3);
     lcd.print("pwd: password1234");
     
-    // Tunggu sampai ada yang connect
     unsigned long startTime = millis();
     while (WiFi.softAPgetStationNum() == 0) {
         if (millis() - startTime > 60000) {
@@ -333,7 +340,6 @@ void startAPMode() {
     }
     Serial.println("\n[WiFi] Device connected to AP!");
     
-    // Setelah ada yang connect, jalankan WiFiManager portal
     wifiManager.startConfigPortal("Hydroponic_NFT", "password1234");
 }
 
@@ -344,11 +350,7 @@ void checkWiFiConnection() {
     if (WiFi.status() != WL_CONNECTED) {
         wifiConnected = false;
         Serial.println("[WiFi] Connection lost!");
-        
-        // Coba reconnect
         WiFi.reconnect();
-        
-        // Tunggu beberapa detik
         delay(5000);
         
         if (WiFi.status() == WL_CONNECTED) {
@@ -366,23 +368,34 @@ void checkWiFiConnection() {
 }
 
 // ============================================================
-// SETUP PUMPS
+// SETUP PUMPS (ACTIVE LOW)
 // ============================================================
 void setupPumps() {
     for (int i = 0; i < NUM_PUMPS; i++) {
         pinMode(pumpPins[i], OUTPUT);
-        digitalWrite(pumpPins[i], LOW);
+        digitalWrite(pumpPins[i], HIGH);  // HIGH = OFF (Active Low)
         pumpState[i] = false;
     }
     Serial.println("[Pumps] Initialized (all OFF)");
-    Serial.println("  GPIO Configuration:");
-    Serial.println("    Aerator    : GPIO" + String(PIN_AERATOR));
-    Serial.println("    Sirkulasi 1: GPIO" + String(PIN_SIRKULASI_1));
-    Serial.println("    Sirkulasi 2: GPIO" + String(PIN_SIRKULASI_2));
-    Serial.println("    pH Up      : GPIO" + String(PIN_PH_UP));
-    Serial.println("    pH Down    : GPIO" + String(PIN_PH_DOWN));
-    Serial.println("    Nutrisi A  : GPIO" + String(PIN_NUTRISI_A));
-    Serial.println("    Nutrisi B  : GPIO" + String(PIN_NUTRISI_B));
+    Serial.println("  Relay Configuration (Active LOW):");
+    Serial.println("    Relay 1 - Aerator    : GPIO" + String(PIN_AERATOR));
+    Serial.println("    Relay 2 - Sirkulasi  : GPIO" + String(PIN_SIRKULASI));
+    Serial.println("    Relay 3 - pH Up      : GPIO" + String(PIN_PH_UP));
+    Serial.println("    Relay 4 - pH Down    : GPIO" + String(PIN_PH_DOWN));
+    Serial.println("    Relay 5 - Nutrisi A  : GPIO" + String(PIN_NUTRISI_A));
+    Serial.println("    Relay 6 - Nutrisi B  : GPIO" + String(PIN_NUTRISI_B));
+    Serial.println("  LOW = ON, HIGH = OFF");
+}
+
+// ============================================================
+// HANDLE PUMP CONTROL (ACTIVE LOW)
+// ============================================================
+void handlePumpControl(int index, bool state) {
+    // Active Low: LOW = ON, HIGH = OFF
+    digitalWrite(pumpPins[index], state ? LOW : HIGH);
+    pumpState[index] = state;
+    publishPumpStatus(index);
+    Serial.printf("[Pump] %s -> %s\n", pumpNames[index], state ? "ON" : "OFF");
 }
 
 // ============================================================
@@ -416,12 +429,6 @@ void loop() {
         readSensors();
     }
     
-    // ===== Fuzzy Logic Controller =====
-    if (phModeAuto && mqttConnected && (now - lastFuzzyUpdate >= FUZZY_INTERVAL)) {
-        lastFuzzyUpdate = now;
-        fuzzyLogicController();
-    }
-    
     // ===== Update LCD =====
     if (now - lastLCDUpdate >= LCD_UPDATE_INTERVAL) {
         lastLCDUpdate = now;
@@ -452,6 +459,24 @@ void loop() {
             wifiManager.startConfigPortal("Hydroponic_NFT", "password1234");
         } else if (cmd == "help") {
             printHelp();
+        } else if (cmd.startsWith("pump ")) {
+            int idx = cmd.substring(5, 6).toInt() - 1;
+            if (idx >= 0 && idx < NUM_PUMPS) {
+                bool state = !pumpState[idx];
+                handlePumpControl(idx, state);
+            }
+        } else if (cmd == "all on") {
+            for (int i = 0; i < NUM_PUMPS; i++) {
+                handlePumpControl(i, true);
+                delay(100);
+            }
+            Serial.println("[CMD] All pumps ON");
+        } else if (cmd == "all off") {
+            for (int i = 0; i < NUM_PUMPS; i++) {
+                handlePumpControl(i, false);
+                delay(100);
+            }
+            Serial.println("[CMD] All pumps OFF");
         }
     }
     
@@ -521,85 +546,6 @@ float readTDS(float temp) {
 }
 
 // ============================================================
-// FUZZY LOGIC CONTROLLER
-// ============================================================
-void fuzzyLogicController() {
-    // pH error = target - current
-    float targetCenter = (phTargetMin + phTargetMax) / 2.0;
-    float error = phValue - targetCenter;
-    
-    // Membership functions
-    float asamKuat = 0, asamLemah = 0, netral = 0, basaLemah = 0, basaKuat = 0;
-    
-    // Asam Kuat: error <= -0.5
-    if (error <= -0.5) asamKuat = 1.0;
-    else if (error < -0.3) asamKuat = (-0.3 - error) / 0.2;
-    
-    // Asam Lemah: -0.7 < error < -0.05
-    if (error > -0.7 && error < -0.3) asamLemah = (error + 0.7) / 0.4;
-    else if (error >= -0.3 && error < -0.05) asamLemah = (-0.05 - error) / 0.25;
-    
-    // Netral: -0.15 < error < 0.15
-    if (error > -0.15 && error < 0) netral = (error + 0.15) / 0.15;
-    else if (error >= 0 && error < 0.15) netral = (0.15 - error) / 0.15;
-    
-    // Basa Lemah: 0.05 < error < 0.7
-    if (error > 0.05 && error < 0.3) basaLemah = (error - 0.05) / 0.25;
-    else if (error >= 0.3 && error < 0.7) basaLemah = (0.7 - error) / 0.4;
-    
-    // Basa Kuat: error >= 0.5
-    if (error >= 0.5) basaKuat = 1.0;
-    else if (error > 0.3) basaKuat = (error - 0.3) / 0.2;
-    
-    // Defuzzification (Center of Gravity)
-    float crisp = (asamKuat * -1.0 + asamLemah * -0.5 + netral * 0.0 + 
-                   basaLemah * 0.5 + basaKuat * 1.0);
-    float sumW = asamKuat + asamLemah + netral + basaLemah + basaKuat;
-    
-    if (sumW > 0) crisp = crisp / sumW;
-    else crisp = 0;
-    
-    fuzzyStrength = abs(crisp);
-    if (fuzzyStrength > 1.0) fuzzyStrength = 1.0;
-    
-    // Action
-    String action = "idle";
-    if (crisp > 0.08) {
-        action = "dosing-up";
-    } else if (crisp < -0.08) {
-        action = "dosing-down";
-    }
-    fuzzyAction = action;
-    
-    // Execute action
-    if (action == "dosing-up" && !pumpState[3]) { // pH Up
-        if (!pumpState[4]) { // pH Down off
-            handlePumpControl(3, true);
-        }
-    } else if (action == "dosing-down" && !pumpState[4]) { // pH Down
-        if (!pumpState[3]) { // pH Up off
-            handlePumpControl(4, true);
-        }
-    } else if (action == "idle") {
-        if (pumpState[3]) handlePumpControl(3, false);
-        if (pumpState[4]) handlePumpControl(4, false);
-    }
-    
-    Serial.printf("[Fuzzy] error: %.3f | action: %s | strength: %.1f%%\n", 
-                  error, action.c_str(), fuzzyStrength * 100);
-}
-
-// ============================================================
-// HANDLE PUMP CONTROL
-// ============================================================
-void handlePumpControl(int index, bool state) {
-    digitalWrite(pumpPins[index], state ? HIGH : LOW);
-    pumpState[index] = state;
-    publishPumpStatus(index);
-    Serial.printf("[Pump] %s -> %s\n", pumpNames[index], state ? "ON" : "OFF");
-}
-
-// ============================================================
 // MQTT CALLBACK
 // ============================================================
 void callback(char* topic, byte* payload, unsigned int length) {
@@ -616,12 +562,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
     // ===== Pump Controls =====
     for (int i = 0; i < NUM_PUMPS; i++) {
         if (topicStr == String(controlTopics[i])) {
-            // Jangan izinkan pH pump di manual jika auto mode
-            if ((i == 3 || i == 4) && phModeAuto) {
-                // Di auto mode, fuzzy yang kontrol
-                Serial.printf("[MQTT] pH pump control ignored (auto mode)\n");
-                return;
-            }
             handlePumpControl(i, isON);
             return;
         }
@@ -635,45 +575,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     }
     
     // ===== PH Mode =====
-    if (topicStr == "hydroponic/riski/control/phmode") {
-        phModeAuto = (message == "auto" || message == "AUTO");
-        prefs.begin("hydroponic", false);
-        prefs.putBool("phMode", phModeAuto);
-        prefs.end();
-        Serial.printf("[MQTT] pH Mode: %s\n", phModeAuto ? "AUTO" : "MANUAL");
-        if (!phModeAuto) {
-            // Matikan pH pumps saat pindah ke manual
-            if (pumpState[3]) handlePumpControl(3, false);
-            if (pumpState[4]) handlePumpControl(4, false);
+    if (topicStr == TOPIC_CONTROL_PHMODE) {
+        if (message == "auto" || message == "AUTO") {
+            phModeAuto = true;
+            Serial.println("[MQTT] Mode: AUTO (Fuzzy di dashboard)");
+        } else if (message == "manual" || message == "MANUAL") {
+            phModeAuto = false;
+            Serial.println("[MQTT] Mode: MANUAL");
         }
-    }
-    
-    // ===== Preset Tanaman =====
-    if (topicStr == "hydroponic/riski/control/preset") {
-        try {
-            StaticJsonDocument<128> doc;
-            deserializeJson(doc, message);
-            
-            if (doc.containsKey("phMin") && doc.containsKey("phMax")) {
-                float newMin = doc["phMin"];
-                float newMax = doc["phMax"];
-                
-                if (newMin > 0 && newMax > 0 && newMin < newMax) {
-                    phTargetMin = newMin;
-                    phTargetMax = newMax;
-                    
-                    prefs.begin("hydroponic", false);
-                    prefs.putFloat("phMin", phTargetMin);
-                    prefs.putFloat("phMax", phTargetMax);
-                    prefs.end();
-                    
-                    Serial.printf("[MQTT] Preset applied: pH %.1f - %.1f\n", 
-                                  phTargetMin, phTargetMax);
-                }
-            }
-        } catch (const std::exception& e) {
-            Serial.printf("[MQTT] Preset parse error: %s\n", e.what());
-        }
+        return;
     }
 }
 
@@ -699,8 +609,7 @@ void reconnectMQTT() {
             mqttClient.subscribe(controlTopics[i]);
         }
         mqttClient.subscribe(TOPIC_STATUS_REQUEST);
-        mqttClient.subscribe("hydroponic/riski/control/phmode");
-        mqttClient.subscribe("hydroponic/riski/control/preset");
+        mqttClient.subscribe(TOPIC_CONTROL_PHMODE);
         
         // Publish status
         mqttClient.publish(TOPIC_STATUS_DEVICE, "online");
@@ -746,27 +655,24 @@ void publishMQTT() {
     mqttClient.publish(TOPIC_SENSOR_TEMP, buffer);
     
     // ===== All Data as JSON =====
-    StaticJsonDocument<512> doc;
+    StaticJsonDocument<256> doc;
     doc["ph"] = phValue;
     doc["tds"] = tdsValue;
     doc["temperature"] = tempValue;
     doc["timestamp"] = millis();
-    doc["ph_target_min"] = phTargetMin;
-    doc["ph_target_max"] = phTargetMax;
-    doc["ph_mode"] = phModeAuto ? "auto" : "manual";
-    doc["fuzzy_strength"] = fuzzyStrength;
-    doc["fuzzy_action"] = fuzzyAction;
     
     // Pump status
     doc["aerator"] = pumpState[0] ? "ON" : "OFF";
-    doc["sirkulasi1"] = pumpState[1] ? "ON" : "OFF";
-    doc["sirkulasi2"] = pumpState[2] ? "ON" : "OFF";
-    doc["phup"] = pumpState[3] ? "ON" : "OFF";
-    doc["phdown"] = pumpState[4] ? "ON" : "OFF";
-    doc["nutrisia"] = pumpState[5] ? "ON" : "OFF";
-    doc["nutrisib"] = pumpState[6] ? "ON" : "OFF";
+    doc["sirkulasi"] = pumpState[1] ? "ON" : "OFF";
+    doc["phup"] = pumpState[2] ? "ON" : "OFF";
+    doc["phdown"] = pumpState[3] ? "ON" : "OFF";
+    doc["nutrisia"] = pumpState[4] ? "ON" : "OFF";
+    doc["nutrisib"] = pumpState[5] ? "ON" : "OFF";
     
-    char jsonBuffer[512];
+    // Mode info
+    doc["ph_mode"] = phModeAuto ? "auto" : "manual";
+    
+    char jsonBuffer[256];
     serializeJson(doc, jsonBuffer);
     mqttClient.publish(TOPIC_SENSOR_ALL, jsonBuffer);
     
@@ -786,10 +692,11 @@ void updateLCD() {
     lcd.print(" TDS:");
     lcd.print(tdsValue, 0);
     
-    // Baris 2: Status
+    // Baris 2: Status + Mode
     lcd.setCursor(0, 1);
     if (wifiConnected && mqttConnected) {
-        lcd.print("MQTT Online ");
+        lcd.print("MQTT ");
+        lcd.print(phModeAuto ? "A" : "M");  // A=Auto, M=Manual
     } else if (wifiConnected && !mqttConnected) {
         lcd.print("MQTT Offline");
     } else {
@@ -801,8 +708,8 @@ void updateLCD() {
     for (int i = 0; i < NUM_PUMPS; i++) {
         if (pumpState[i]) activePumps++;
     }
-    lcd.setCursor(12, 1);
-    lcd.print("P:");
+    lcd.setCursor(13, 1);
+    lcd.print("P");
     lcd.print(activePumps);
 }
 
@@ -819,9 +726,7 @@ void printStatus() {
     Serial.println("╠═══════════════════════════════════════╣");
     Serial.printf("║ WiFi        : %s                ║\n", wifiConnected ? "Connected" : "Offline");
     Serial.printf("║ MQTT        : %s                ║\n", mqttConnected ? "Connected" : "Disconnected");
-    Serial.printf("║ pH Mode     : %s                ║\n", phModeAuto ? "AUTO" : "MANUAL");
-    Serial.printf("║ pH Target   : %.1f - %.1f        ║\n", phTargetMin, phTargetMax);
-    Serial.printf("║ Fuzzy       : %s (%.1f%%)      ║\n", fuzzyAction.c_str(), fuzzyStrength * 100);
+    Serial.printf("║ pH Mode     : %s                ║\n", phModeAuto ? "AUTO (Fuzzy di Dashboard)" : "MANUAL");
     Serial.println("╠═══════════════════════════════════════╣");
     Serial.println("║ PUMP STATUS                         ║");
     for (int i = 0; i < NUM_PUMPS; i++) {
@@ -835,9 +740,12 @@ void printStatus() {
 // ============================================================
 void printHelp() {
     Serial.println("\n=== COMMANDS ===");
-    Serial.println(" status  - Show system status");
-    Serial.println(" reset   - Restart ESP32");
-    Serial.println(" wm      - Open WiFiManager portal");
-    Serial.println(" help    - Show this help");
+    Serial.println(" status     - Show system status");
+    Serial.println(" reset      - Restart ESP32");
+    Serial.println(" wm         - Open WiFiManager portal");
+    Serial.println(" pump 1-6   - Toggle pump");
+    Serial.println(" all on     - Turn all pumps ON");
+    Serial.println(" all off    - Turn all pumps OFF");
+    Serial.println(" help       - Show this help");
     Serial.println("========================================\n");
 }
