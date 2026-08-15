@@ -15,13 +15,9 @@
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
     
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    
     <style>
         /* ============================================================
            HYDROPONIC NFT DASHBOARD - STYLE
-           Inspired by Smart RO Monitor
            ============================================================ */
         :root {
             --bg-main: #0a0f1a;
@@ -335,22 +331,6 @@
             font-family: 'Outfit', sans-serif;
         }
 
-        /* ============ FILTER / PUMP STATUS ============ */
-        .status-led {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        .status-led.green { background: var(--success); box-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
-        .status-led.yellow { background: var(--warning); box-shadow: 0 0 12px rgba(245, 158, 11, 0.5); animation: pulse-yellow 1.5s infinite; }
-        .status-led.red { background: var(--danger); box-shadow: 0 0 12px rgba(239, 68, 68, 0.5); animation: pulse-red 1s infinite; }
-
-        @keyframes pulse-yellow { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        @keyframes pulse-red { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
-
         /* ============ PUMP CONTROLS ============ */
         .pump-grid {
             display: grid;
@@ -401,7 +381,6 @@
         .pump-item .pump-name { font-size: 0.8rem; font-weight: 600; }
         .pump-item .pump-pin { font-size: 0.65rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
 
-        /* Toggle Switch */
         .switch {
             position: relative;
             width: 40px;
@@ -537,21 +516,6 @@
         }
 
         .ph-target-row span { color: var(--text-muted); font-weight: 600; }
-
-        .ph-select {
-            width: 100%;
-            font-family: 'Outfit', sans-serif;
-            font-size: 0.8rem;
-            font-weight: 500;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            background: var(--card-bg);
-            color: var(--text-main);
-            cursor: pointer;
-        }
-
-        .ph-select option { background: var(--card-bg); }
 
         .fuzzy-box {
             background: var(--bg-main);
@@ -720,6 +684,22 @@
         }
 
         .grid-col-span-2 { grid-column: 1 / -1; }
+
+        /* ============ RAW DATA ============ */
+        .code-block {
+            background: #0a0f1a;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+            line-height: 1.6;
+            border: 1px solid #1f2937;
+            white-space: pre-wrap;
+        }
     </style>
 </head>
 <body>
@@ -757,11 +737,11 @@
         <div class="conn-bar">
             <div class="conn-item">
                 <span class="conn-k">Host</span>
-                <span class="conn-v">broker.hivemq.com</span>
+                <span class="conn-v" id="connHost">broker.hivemq.com</span>
             </div>
             <div class="conn-item">
                 <span class="conn-k">Port</span>
-                <span class="conn-v">8084 (WSS)</span>
+                <span class="conn-v" id="connPort">8084 (WSS)</span>
             </div>
             <div class="conn-item">
                 <span class="conn-k">Client ID</span>
@@ -801,7 +781,6 @@
             <section class="card">
                 <div class="card-header">
                     <span class="card-title"><i class="fa-solid fa-microchip"></i> Parameter Sensor</span>
-                    <span id="sensorCount" class="badge neutral">0 aktif</span>
                 </div>
                 <div class="params-grid" id="sensorGrid"></div>
             </section>
@@ -828,20 +807,7 @@
                 <div class="card-header">
                     <span class="card-title"><i class="fa-solid fa-code"></i> Data Telemetry</span>
                 </div>
-                <pre id="lastMessage" style="
-                    background: #0a0f1a;
-                    color: #e2e8f0;
-                    padding: 1rem;
-                    border-radius: 10px;
-                    font-family: 'JetBrains Mono', monospace;
-                    font-size: 0.7rem;
-                    overflow-x: auto;
-                    max-height: 200px;
-                    overflow-y: auto;
-                    line-height: 1.6;
-                    border: 1px solid #1f2937;
-                    white-space: pre-wrap;
-                ">Menunggu data dari ESP32...</pre>
+                <pre id="lastMessage" class="code-block">Menunggu data dari ESP32...</pre>
             </section>
         </div>
     </div>
@@ -857,31 +823,37 @@
            ========================================================================== */
 
         // ==================== MQTT CONFIG ====================
-        const MQTT_CONFIG = {
-            broker: 'wss://broker.hivemq.com:8084/mqtt',
-            topics: {
-                ph: 'hydroponic/riski/sensor/ph',
-                tds: 'hydroponic/riski/sensor/tds',
-                temp: 'hydroponic/riski/sensor/temp',
-                all: 'hydroponic/riski/sensor/all',
-                controlAerator: 'hydroponic/riski/control/aerator',
-                controlSirkulasi1: 'hydroponic/riski/control/sirkulasi1',
-                controlSirkulasi2: 'hydroponic/riski/control/sirkulasi2',
-                controlPhUp: 'hydroponic/riski/control/phup',
-                controlPhDown: 'hydroponic/riski/control/phdown',
-                controlNutrisiA: 'hydroponic/riski/control/nutrisia',
-                controlNutrisiB: 'hydroponic/riski/control/nutrisib',
-                statusAerator: 'hydroponic/riski/status/aerator',
-                statusSirkulasi1: 'hydroponic/riski/status/sirkulasi1',
-                statusSirkulasi2: 'hydroponic/riski/status/sirkulasi2',
-                statusPhUp: 'hydroponic/riski/status/phup',
-                statusPhDown: 'hydroponic/riski/status/phdown',
-                statusNutrisiA: 'hydroponic/riski/status/nutrisia',
-                statusNutrisiB: 'hydroponic/riski/status/nutrisib',
-                statusDevice: 'hydroponic/riski/status/device',
-                statusDashboard: 'hydroponic/riski/status/dashboard',
-                statusRequest: 'hydroponic/riski/status/request'
-            }
+        // Gunakan broker yang lebih stabil
+        const MQTT_BROKERS = [
+            'wss://broker.hivemq.com:8884/mqtt',      // HiveMQ port 8884 (lebih stabil)
+            'wss://test.mosquitto.org:8081/mqtt',     // Mosquitto test
+            'wss://broker.emqx.io:8084/mqtt'          // EMQX public
+        ];
+        
+        let currentBrokerIndex = 0;
+
+        const MQTT_TOPICS = {
+            ph: 'hydroponic/riski/sensor/ph',
+            tds: 'hydroponic/riski/sensor/tds',
+            temp: 'hydroponic/riski/sensor/temp',
+            all: 'hydroponic/riski/sensor/all',
+            controlAerator: 'hydroponic/riski/control/aerator',
+            controlSirkulasi1: 'hydroponic/riski/control/sirkulasi1',
+            controlSirkulasi2: 'hydroponic/riski/control/sirkulasi2',
+            controlPhUp: 'hydroponic/riski/control/phup',
+            controlPhDown: 'hydroponic/riski/control/phdown',
+            controlNutrisiA: 'hydroponic/riski/control/nutrisia',
+            controlNutrisiB: 'hydroponic/riski/control/nutrisib',
+            statusAerator: 'hydroponic/riski/status/aerator',
+            statusSirkulasi1: 'hydroponic/riski/status/sirkulasi1',
+            statusSirkulasi2: 'hydroponic/riski/status/sirkulasi2',
+            statusPhUp: 'hydroponic/riski/status/phup',
+            statusPhDown: 'hydroponic/riski/status/phdown',
+            statusNutrisiA: 'hydroponic/riski/status/nutrisia',
+            statusNutrisiB: 'hydroponic/riski/status/nutrisib',
+            statusDevice: 'hydroponic/riski/status/device',
+            statusDashboard: 'hydroponic/riski/status/dashboard',
+            statusRequest: 'hydroponic/riski/status/request'
         };
 
         // ==================== SENSOR CONFIG ====================
@@ -920,7 +892,8 @@
             hasReceivedData: false,
             isConnecting: false,
             reconnectAttempts: 0,
-            maxReconnectAttempts: 10
+            maxReconnectAttempts: 15,
+            usingBroker: 0
         };
 
         let mqttClient = null;
@@ -939,6 +912,8 @@
             pktCount: document.getElementById('pktCount'),
             clientId: document.getElementById('clientId'),
             reconnectBtn: document.getElementById('reconnectBtn'),
+            connHost: document.getElementById('connHost'),
+            connPort: document.getElementById('connPort'),
             sensorGrid: document.getElementById('sensorGrid'),
             pumpGrid: document.getElementById('pumpGrid'),
             phPanel: document.getElementById('phPanel'),
@@ -952,7 +927,10 @@
         // ==================== INIT ====================
         document.addEventListener('DOMContentLoaded', () => {
             console.log('🌱 Hydroponic NFT Dashboard');
-            console.log('📡 Broker:', MQTT_CONFIG.broker);
+            console.log('📡 Broker:', MQTT_BROKERS[0]);
+            
+            DOM.connHost.textContent = 'broker.hivemq.com';
+            DOM.connPort.textContent = '8884 (WSS)';
             
             renderSensors();
             renderPumps();
@@ -982,26 +960,39 @@
             state.reconnectAttempts++;
             updateConnStatus();
             
+            // Coba broker berikutnya jika sudah beberapa kali gagal
+            if (state.reconnectAttempts > 3 && currentBrokerIndex < MQTT_BROKERS.length - 1) {
+                currentBrokerIndex++;
+                const host = new URL(MQTT_BROKERS[currentBrokerIndex]).hostname;
+                DOM.connHost.textContent = host;
+                DOM.connPort.textContent = 'WSS';
+                console.log('🔄 Switching to broker:', MQTT_BROKERS[currentBrokerIndex]);
+                showToast('🔄 Mencoba broker alternatif...', 'info');
+            }
+            
+            const brokerUrl = MQTT_BROKERS[currentBrokerIndex];
             const clientId = 'dash_' + Math.random().toString(16).substr(2, 8);
+            state.clientId = clientId;
             DOM.clientId.textContent = clientId;
             
             const options = {
                 clientId: clientId,
                 clean: true,
-                reconnectPeriod: 5000,
+                reconnectPeriod: 3000,
                 keepAlive: 60,
-                connectTimeout: 30000,
-                will: { topic: MQTT_CONFIG.topics.statusDashboard, payload: 'offline', qos: 1, retain: false }
+                connectTimeout: 15000,
+                will: { topic: MQTT_TOPICS.statusDashboard, payload: 'offline', qos: 1, retain: false }
             };
             
             console.log('🔄 Connecting... (attempt', state.reconnectAttempts + ')');
+            console.log('📡 Broker:', brokerUrl);
             showToast('🔄 Menghubungkan...', 'info');
             
             try {
-                mqttClient = mqtt.connect(MQTT_CONFIG.broker, options);
+                mqttClient = mqtt.connect(brokerUrl, options);
                 
                 mqttClient.on('connect', () => {
-                    console.log('✅ MQTT Connected');
+                    console.log('✅ MQTT Connected to', brokerUrl);
                     state.broker = 'online';
                     state.mqttConnected = true;
                     state.isConnecting = false;
@@ -1011,21 +1002,26 @@
                     showToast('✅ MQTT Terhubung!', 'success');
                     
                     const topics = [
-                        MQTT_CONFIG.topics.ph, MQTT_CONFIG.topics.tds, MQTT_CONFIG.topics.temp,
-                        MQTT_CONFIG.topics.all, MQTT_CONFIG.topics.statusDevice,
-                        MQTT_CONFIG.topics.statusAerator, MQTT_CONFIG.topics.statusSirkulasi1,
-                        MQTT_CONFIG.topics.statusSirkulasi2, MQTT_CONFIG.topics.statusPhUp,
-                        MQTT_CONFIG.topics.statusPhDown, MQTT_CONFIG.topics.statusNutrisiA,
-                        MQTT_CONFIG.topics.statusNutrisiB
+                        MQTT_TOPICS.ph, MQTT_TOPICS.tds, MQTT_TOPICS.temp,
+                        MQTT_TOPICS.all, MQTT_TOPICS.statusDevice,
+                        MQTT_TOPICS.statusAerator, MQTT_TOPICS.statusSirkulasi1,
+                        MQTT_TOPICS.statusSirkulasi2, MQTT_TOPICS.statusPhUp,
+                        MQTT_TOPICS.statusPhDown, MQTT_TOPICS.statusNutrisiA,
+                        MQTT_TOPICS.statusNutrisiB, MQTT_TOPICS.statusRequest
                     ];
                     
-                    topics.forEach(t => mqttClient.subscribe(t, { qos: 1 }));
+                    topics.forEach(t => {
+                        mqttClient.subscribe(t, { qos: 1 }, (err) => {
+                            if (!err) console.log('✅ Subscribed:', t);
+                        });
+                    });
+                    
                     mqttClient.subscribe('hydroponic/riski/#', { qos: 1 });
-                    mqttClient.publish(MQTT_CONFIG.topics.statusDashboard, 'online', { qos: 1 });
+                    mqttClient.publish(MQTT_TOPICS.statusDashboard, 'online', { qos: 1 });
                     
                     setTimeout(() => {
                         if (mqttClient && mqttClient.connected) {
-                            mqttClient.publish(MQTT_CONFIG.topics.statusRequest, 'STATUS');
+                            mqttClient.publish(MQTT_TOPICS.statusRequest, 'STATUS');
                         }
                     }, 1000);
                 });
@@ -1035,13 +1031,21 @@
                 });
                 
                 mqttClient.on('error', (err) => {
-                    console.error('❌ MQTT Error:', err);
+                    console.error('❌ MQTT Error:', err.message);
                     state.broker = 'offline';
                     state.mqttConnected = false;
                     state.isConnecting = false;
                     updateConnStatus();
-                    showToast('❌ Error: ' + err.message, 'error');
-                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
+                    
+                    if (err.message.includes('Connection refused') || err.message.includes('timeout')) {
+                        showToast('⚠️ Koneksi ditolak, coba lagi...', 'warning');
+                    } else {
+                        showToast('❌ Error: ' + err.message, 'error');
+                    }
+                    
+                    setTimeout(() => {
+                        if (!state.mqttConnected) connectMQTT();
+                    }, 5000);
                 });
                 
                 mqttClient.on('offline', () => {
@@ -1052,13 +1056,21 @@
                     updateConnStatus();
                 });
                 
+                mqttClient.on('reconnect', () => {
+                    console.log('🔄 Reconnecting...');
+                    state.broker = 'connecting';
+                    updateConnStatus();
+                });
+                
                 mqttClient.on('close', () => {
                     console.log('🔌 Closed');
                     state.broker = 'offline';
                     state.mqttConnected = false;
                     state.isConnecting = false;
                     updateConnStatus();
-                    setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 3000);
+                    setTimeout(() => {
+                        if (!state.mqttConnected) connectMQTT();
+                    }, 3000);
                 });
                 
             } catch (e) {
@@ -1066,7 +1078,10 @@
                 state.broker = 'offline';
                 state.isConnecting = false;
                 updateConnStatus();
-                setTimeout(() => { if (!state.mqttConnected) connectMQTT(); }, 5000);
+                showToast('❌ Error: ' + e.message, 'error');
+                setTimeout(() => {
+                    if (!state.mqttConnected) connectMQTT();
+                }, 5000);
             }
         }
 
@@ -1077,14 +1092,14 @@
             DOM.dataCount.textContent = state.packets;
             DOM.lastUpdate.textContent = new Date().toLocaleTimeString();
             
-            if (topic === MQTT_CONFIG.topics.statusDevice) {
+            if (topic === MQTT_TOPICS.statusDevice) {
                 state.esp = payload === 'online' ? 'active' : 'inactive';
                 updateConnStatus();
                 if (payload === 'online') showToast('✅ ESP32 Online!', 'success');
                 return;
             }
             
-            if (topic === MQTT_CONFIG.topics.all) {
+            if (topic === MQTT_TOPICS.all) {
                 try {
                     const data = JSON.parse(payload);
                     DOM.lastMessage.textContent = JSON.stringify(data, null, 2);
@@ -1110,21 +1125,35 @@
                     if (data.nutrisia !== undefined) state.pumps.nutrisiA = data.nutrisia === 'ON';
                     if (data.nutrisib !== undefined) state.pumps.nutrisiB = data.nutrisib === 'ON';
                     
+                    if (data.ph_target_min !== undefined) {
+                        state.phTarget.min = parseFloat(data.ph_target_min);
+                    }
+                    if (data.ph_target_max !== undefined) {
+                        state.phTarget.max = parseFloat(data.ph_target_max);
+                    }
+                    if (data.fuzzy_strength !== undefined) {
+                        state.fuzzy.strength = parseFloat(data.fuzzy_strength);
+                    }
+                    if (data.ph_mode !== undefined) {
+                        state.phMode = data.ph_mode;
+                    }
+                    
                     renderPumps();
                     renderPhPanel();
                     updateStatusUI();
                     
                 } catch (e) {
                     console.warn('⚠️ Parse error:', e);
+                    DOM.lastMessage.textContent = '❌ Parse error: ' + e.message + '\n\nRaw: ' + payload.substring(0, 200);
                 }
                 return;
             }
             
             // Individual sensors
             const sensorMap = {
-                [MQTT_CONFIG.topics.ph]: 'ph',
-                [MQTT_CONFIG.topics.tds]: 'tds',
-                [MQTT_CONFIG.topics.temp]: 'temp'
+                [MQTT_TOPICS.ph]: 'ph',
+                [MQTT_TOPICS.tds]: 'tds',
+                [MQTT_TOPICS.temp]: 'temp'
             };
             if (sensorMap[topic]) {
                 const val = parseFloat(payload);
@@ -1137,13 +1166,13 @@
             
             // Pump status
             const pumpMap = {
-                [MQTT_CONFIG.topics.statusAerator]: 'aerator',
-                [MQTT_CONFIG.topics.statusSirkulasi1]: 'sirkulasi1',
-                [MQTT_CONFIG.topics.statusSirkulasi2]: 'sirkulasi2',
-                [MQTT_CONFIG.topics.statusPhUp]: 'phUp',
-                [MQTT_CONFIG.topics.statusPhDown]: 'phDown',
-                [MQTT_CONFIG.topics.statusNutrisiA]: 'nutrisiA',
-                [MQTT_CONFIG.topics.statusNutrisiB]: 'nutrisiB'
+                [MQTT_TOPICS.statusAerator]: 'aerator',
+                [MQTT_TOPICS.statusSirkulasi1]: 'sirkulasi1',
+                [MQTT_TOPICS.statusSirkulasi2]: 'sirkulasi2',
+                [MQTT_TOPICS.statusPhUp]: 'phUp',
+                [MQTT_TOPICS.statusPhDown]: 'phDown',
+                [MQTT_TOPICS.statusNutrisiA]: 'nutrisiA',
+                [MQTT_TOPICS.statusNutrisiB]: 'nutrisiB'
             };
             if (pumpMap[topic]) {
                 state.pumps[pumpMap[topic]] = payload === 'ON';
@@ -1191,6 +1220,22 @@
                 const sensor = SENSORS.find(s => s.key === key);
                 el.innerHTML = value.toFixed(sensor.decimals) + ' <span class="unit">' + sensor.unit + '</span>';
             }
+            // Update badge
+            const badge = document.getElementById(`badge_${key}`);
+            if (badge) {
+                const sensor = SENSORS.find(s => s.key === key);
+                const inRange = value >= sensor.idealMin && value <= sensor.idealMax;
+                if (inRange) {
+                    badge.textContent = 'Normal';
+                    badge.className = 'param-badge safe';
+                } else if (value < sensor.idealMin || value > sensor.idealMax) {
+                    badge.textContent = 'Warn';
+                    badge.className = 'param-badge warn';
+                } else {
+                    badge.textContent = '--';
+                    badge.className = 'param-badge neutral';
+                }
+            }
         }
 
         function renderSensors() {
@@ -1230,13 +1275,14 @@
             
             DOM.pumpGrid.querySelectorAll('[data-pump]').forEach(input => {
                 input.addEventListener('change', (e) => {
-                    const key = e.target.dataset.pump;
+                    const key = e.target.dataset.key || e.target.dataset.pump;
                     const val = e.target.checked;
                     state.pumps[key] = val;
                     
                     const pump = [...PUMPS, ...PH_PUMPS].find(p => p.key === key);
                     if (pump) {
-                        const topic = MQTT_CONFIG.topics['control' + key.charAt(0).toUpperCase() + key.slice(1)];
+                        const topicKey = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                        const topic = MQTT_TOPICS[topicKey];
                         if (topic) publishControl(topic, val ? 'ON' : 'OFF');
                     }
                     renderPumps();
@@ -1316,8 +1362,11 @@
                     if (state.phMode === 'manual') {
                         state.pumps.phUp = false;
                         state.pumps.phDown = false;
-                        publishControl(MQTT_CONFIG.topics.controlPhUp, 'OFF');
-                        publishControl(MQTT_CONFIG.topics.controlPhDown, 'OFF');
+                        publishControl(MQTT_TOPICS.controlPhUp, 'OFF');
+                        publishControl(MQTT_TOPICS.controlPhDown, 'OFF');
+                    } else {
+                        // Publish mode auto
+                        publishControl('hydroponic/riski/control/phmode', 'auto');
                     }
                     renderPhPanel();
                     renderPumps();
@@ -1331,7 +1380,8 @@
                     state.pumps.phUp = key === 'phUp' ? next : false;
                     state.pumps.phDown = key === 'phDown' ? next : false;
                     
-                    publishControl(MQTT_CONFIG.topics['control' + key.charAt(0).toUpperCase() + key.slice(1)], next ? 'ON' : 'OFF');
+                    const topicKey = 'control' + key.charAt(0).toUpperCase() + key.slice(1);
+                    publishControl(MQTT_TOPICS[topicKey], next ? 'ON' : 'OFF');
                     renderPhPanel();
                     renderPumps();
                 });
@@ -1435,7 +1485,7 @@
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.3s';
                 setTimeout(() => toast.remove(), 300);
-            }, 3500);
+            }, 4000);
         }
 
         // ==================== RECONNECT ====================
@@ -1448,6 +1498,8 @@
                 showToast('🔌 Terputus', 'info');
             } else {
                 state.reconnectAttempts = 0;
+                currentBrokerIndex = 0;
+                DOM.connHost.textContent = 'broker.hivemq.com';
                 connectMQTT();
             }
         });
@@ -1460,7 +1512,7 @@
         updateStatusUI();
 
         console.log('✅ Dashboard ready!');
-        console.log('📡 Topics:', MQTT_CONFIG.topics);
+        console.log('📡 Topics:', MQTT_TOPICS);
     </script>
 </body>
 </html>
